@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 )
 
@@ -41,6 +42,9 @@ func main() {
 	defer database.CloseSQLxDB(db)
 
 	app := server.NewFiberServer()
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.SendString("OK")
+	})
 
 	userRepo := postgres.NewUserRepository(db)
 	jwtSecret := getEnv("JWT_SECRET", "your_default_secret")
