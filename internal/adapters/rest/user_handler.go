@@ -31,22 +31,17 @@ func (uh *UserHandler) Login(c *fiber.Ctx) error {
 		})
 	}
 
-	user, jwt_token, err := uh.userUsecase.Login(c.Context(), loginRequest)
+	loginResponse, err := uh.userUsecase.Login(c.Context(), loginRequest)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid credentials",
 		})
 	}
 
-	userResponse := map[string]interface{}{
-		"user":         user,
-		"access_token": jwt_token,
-	}
-
 	return c.JSON(
 		fiber.Map{
 			"message": "Login successful",
-			"data":    userResponse,
+			"data":    loginResponse,
 		},
 	)
 }

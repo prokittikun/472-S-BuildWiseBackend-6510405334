@@ -1,94 +1,143 @@
+// usecase/project_usecase.go
 package usecase
 
 import (
-	"boonkosang/internal/domain/models"
 	"boonkosang/internal/repositories"
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 )
 
 type ProjectUsecase interface {
-	CreateProject(ctx context.Context, req requests.CreateProjectRequest) (*models.Project, error)
-	ListProjects(ctx context.Context) ([]*responses.ProjectResponse, error)
-	GetProject(ctx context.Context, id uuid.UUID) (*models.Project, error)
-	UpdateProject(ctx context.Context, id uuid.UUID, req requests.UpdateProjectRequest) (*models.Project, error)
-	DeleteProject(ctx context.Context, id uuid.UUID) error
+	Create(ctx context.Context, req requests.CreateProjectRequest) (*responses.ProjectResponse, error)
+	Update(ctx context.Context, id uuid.UUID, req requests.UpdateProjectRequest) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	GetByID(ctx context.Context, id uuid.UUID) (*responses.ProjectResponse, error)
+	List(ctx context.Context) (*responses.ProjectListResponse, error)
 }
 
 type projectUsecase struct {
 	projectRepo repositories.ProjectRepository
+	clientRepo  repositories.ClientRepository
 }
 
-func NewProjectUsecase(projectRepo repositories.ProjectRepository) ProjectUsecase {
+func NewProjectUsecase(projectRepo repositories.ProjectRepository, clientRepo repositories.ClientRepository) ProjectUsecase {
 	return &projectUsecase{
 		projectRepo: projectRepo,
+		clientRepo:  clientRepo,
 	}
 }
 
-func (pu *projectUsecase) CreateProject(ctx context.Context, req requests.CreateProjectRequest) (*models.Project, error) {
-	project := &models.Project{
-		ProjectID:   uuid.New(),
-		Name:        req.Name,
-		Description: req.Description,
-		Status:      "planning",
-		ContractURL: req.ContractURL,
-		StartDate:   req.StartDate,
-		EndDate:     req.EndDate,
+func (u *projectUsecase) Create(ctx context.Context, req requests.CreateProjectRequest) (*responses.ProjectResponse, error) {
+	client, err := u.clientRepo.GetByID(ctx, req.ClientID)
+	if err != nil {
+		return nil, errors.New("client not found")
 	}
 
-	err := pu.projectRepo.CreateProject(ctx, project)
+	project, err := u.projectRepo.Create(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return project, nil
+	return &responses.ProjectResponse{
+		ID:          project.ProjectID,
+		Name:        project.Name,
+		Description: project.Description,
+		Address:     project.Address,
+		Status:      project.Status,
+		ClientID:    project.ClientID,
+		Client: &responses.ClientResponse{
+			ID:      client.ClientID,
+			Name:    client.Name,
+			Email:   client.Email,
+			Tel:     client.Tel,
+			Address: client.Address,
+			TaxID:   client.TaxID,
+		},
+		CreatedAt: project.CreatedAt,
+	}, nil
 }
 
-func (pu *projectUsecase) ListProjects(ctx context.Context) ([]*responses.ProjectResponse, error) {
-	return pu.projectRepo.ListProjects(ctx)
+func (u *projectUsecase) Update(ctx context.Context, id uuid.UUID, req requests.UpdateProjectRequest) error {
+	_, err := u.projectRepo.GetByID(ctx, id)
+	if err != nil {
+		return errors.New("project not found")
+	}
+
+	return u.projectRepo.Update(ctx, id, req)
+
 }
 
-func (pu *projectUsecase) GetProject(ctx context.Context, id uuid.UUID) (*models.Project, error) {
-	return pu.projectRepo.GetProjectByID(ctx, id)
+func (u *projectUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	return u.projectRepo.Delete(ctx, id)
 }
 
-func (pu *projectUsecase) UpdateProject(ctx context.Context, id uuid.UUID, req requests.UpdateProjectRequest) (*models.Project, error) {
-	project, err := pu.projectRepo.GetProjectByID(ctx, id)
+func (u *projectUsecase) GetByID(ctx context.Context, id uuid.UUID) (*responses.ProjectResponse, error) {
+	project, client, err := u.projectRepo.GetByIDWithClient(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Update fields
-	if req.Name != "" {
-		project.Name = req.Name
-	}
-	if req.Description != "" {
-		project.Description = req.Description
-	}
-	if req.Status != "" {
-		project.Status = req.Status
-	}
-	if req.ContractURL != "" {
-		project.ContractURL = req.ContractURL
-	}
-	if !req.StartDate.IsZero() {
-		project.StartDate = req.StartDate
-	}
-	if !req.EndDate.IsZero() {
-		project.EndDate = req.EndDate
-	}
+	return &responses.ProjectResponse{
+		ID:          project.ProjectID,
+		Name:        project.Name,
+		Description: project.Description,
+		Address:     project.Address,
+		Status:      project.Status,
+		ClientID:    project.ClientID,
+		Client: &responses.ClientResponse{
+			ID:      client.ClientID,
+			Name:    client.Name,
+			Email:   client.Email,
+			Tel:     client.Tel,
+			Address: client.Address,
+			TaxID:   client.TaxID,
+		},
+		CreatedAt: project.CreatedAt,
+		UpdatedAt: project.UpdatedAt.Time,
+	}, nil
+}
 
-	err = pu.projectRepo.UpdateProject(ctx, project)
+func (u *projectUsecase) List(
+	ctx context.Context,
+) (*responses.ProjectListResponse, error) {
+
+	projects, err := u.projectRepo.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return project, nil
-}
+	projectResponses := make([]responses.ProjectResponse, len(projects))
+	for i, project := range projects {
+		client, err := u.clientRepo.GetByID(ctx, project.ClientID)
+		if err != nil {
+			return nil, err
+		}
 
-func (pu *projectUsecase) DeleteProject(ctx context.Context, id uuid.UUID) error {
-	return pu.projectRepo.DeleteProject(ctx, id)
+		projectResponses[i] = responses.ProjectResponse{
+			ID:          project.ProjectID,
+			Name:        project.Name,
+			Description: project.Description,
+			Address:     project.Address,
+			Status:      project.Status,
+			ClientID:    project.ClientID,
+			Client: &responses.ClientResponse{
+				ID:      client.ClientID,
+				Name:    client.Name,
+				Email:   client.Email,
+				Tel:     client.Tel,
+				Address: client.Address,
+				TaxID:   client.TaxID,
+			},
+			CreatedAt: project.CreatedAt,
+			UpdatedAt: project.UpdatedAt.Time,
+		}
+	}
+
+	return &responses.ProjectListResponse{
+		Projects: projectResponses,
+	}, nil
 }

@@ -1,6 +1,8 @@
 package responses
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type UserResponse struct {
 	ID        uuid.UUID `json:"id"`
@@ -13,5 +15,5 @@ type UserResponse struct {
 
 type LoginResponse struct {
 	AccessToken string       `json:"access_token"`
-	user        UserResponse `json:"user"`
+	User        UserResponse `json:"user"` // Changed from lowercase to uppercase for export
 }

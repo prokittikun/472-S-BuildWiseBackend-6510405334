@@ -2,15 +2,14 @@ package repositories
 
 import (
 	"boonkosang/internal/domain/models"
+	"boonkosang/internal/requests"
 	"context"
 )
 
 type MaterialRepository interface {
-	CreateMaterial(ctx context.Context, material *models.Material) error
-	ListMaterials(ctx context.Context) ([]*models.Material, error)
-	GetMaterialByName(ctx context.Context, name string) (*models.Material, error)
-	UpdateMaterial(ctx context.Context, material *models.Material) error
-	DeleteMaterial(ctx context.Context, name string) error
-	GetMaterialPriceHistory(ctx context.Context, name string) ([]*models.MaterialPriceLog, error)
-	MaterialExists(ctx context.Context, name string) (bool, error)
+	Create(ctx context.Context, req requests.CreateMaterialRequest) (*models.Material, error)
+	Update(ctx context.Context, materialID string, req requests.UpdateMaterialRequest) error
+	Delete(ctx context.Context, materialID string) error
+	GetByID(ctx context.Context, materialID string) (*models.Material, error)
+	List(ctx context.Context) ([]models.Material, error)
 }

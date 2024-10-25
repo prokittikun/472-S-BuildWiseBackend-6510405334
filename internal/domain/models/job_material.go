@@ -5,9 +5,7 @@ import (
 )
 
 type JobMaterial struct {
-	JobID         uuid.UUID `db:"job_id"`
-	MaterialName  string    `db:"material_name"`
-	Quantity      float64   `db:"quantity"`
-	Type          string    `db:"type"`
-	UnitOfMeasure string    `db:"unit_of_measure"`
+	JobID      uuid.UUID `db:"job_id"`
+	MaterialID string    `db:"material_id"`
+	Quantity   int32     `db:"quantity"`
 }

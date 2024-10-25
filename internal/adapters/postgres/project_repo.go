@@ -3,10 +3,12 @@ package postgres
 import (
 	"boonkosang/internal/domain/models"
 	"boonkosang/internal/repositories"
-	"boonkosang/internal/responses"
+	"boonkosang/internal/requests"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -22,93 +24,155 @@ func NewProjectRepository(db *sqlx.DB) repositories.ProjectRepository {
 	}
 }
 
-func (pr *projectRepository) CreateProject(ctx context.Context, project *models.Project) error {
-	query := `INSERT INTO Project (project_id, name, description, status, contract_url, start_date, end_date, created_at, updated_at)
-			  VALUES (:project_id, :name, :description, :status, :contract_url, :start_date, :end_date, :created_at, :updated_at)`
+func (r *projectRepository) Create(ctx context.Context, req requests.CreateProjectRequest) (*models.Project, error) {
+	project := &models.Project{
+		ProjectID:   uuid.New(),
+		Name:        req.Name,
+		Description: req.Description,
+		Address:     req.Address,
+		Status:      models.ProjectStatusPlanning,
+		ClientID:    req.ClientID,
+		CreatedAt:   time.Now(),
+	}
 
-	_, err := pr.db.NamedExecContext(ctx, query, project)
-	return err
-}
-
-func (pr *projectRepository) ListProjects(ctx context.Context) ([]*responses.ProjectResponse, error) {
 	query := `
-        SELECT 
-          *
-        FROM 
-            Project p
-        JOIN 
-            Client c ON p.client_id = c.client_id
-    `
+        INSERT INTO Project (
+            project_id, name, description, address, status, 
+            client_id, created_at
+        ) VALUES (
+            :project_id, :name, :description, :address, :status,
+            :client_id, :created_at
+        ) RETURNING *`
 
-	rows, err := pr.db.QueryContext(ctx, query)
+	rows, err := r.db.NamedQueryContext(ctx, query, project)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create project: %w", err)
 	}
 	defer rows.Close()
 
-	var projects []*responses.ProjectResponse
-
-	for rows.Next() {
-		var p responses.ProjectResponse
-		var c responses.ClientResponse
-		var quotationID, contractID, invoiceID, bID, clientID sql.NullString
-
-		err := rows.Scan(
-			&p.ID, &p.Name, &p.Description, &p.Status, &p.ContractURL,
-			&p.StartDate, &p.EndDate, &quotationID, &contractID,
-			&invoiceID, &bID, &clientID, &p.CreatedAt, &p.UpdatedAt,
-			&c.ClientID, &c.CompanyName, &c.ContactPerson, &c.Email,
-			&c.Phone, &c.Address, &c.TaxID, &c.CreatedAt, &c.UpdatedAt,
-		)
-		fmt.Print(err)
+	if rows.Next() {
+		err = rows.StructScan(project)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to scan project: %w", err)
 		}
+		return project, nil
+	}
+	return nil, errors.New("failed to create project: no rows returned")
+}
 
-		p.QuotationID = nullStringToNullableUUID(quotationID)
-		p.ContractID = nullStringToNullableUUID(contractID)
-		p.InvoiceID = nullStringToNullableUUID(invoiceID)
-		p.BID = nullStringToNullableUUID(bID)
-		p.ClientID = nullStringToNullableUUID(clientID)
+func (r *projectRepository) Update(ctx context.Context, id uuid.UUID, req requests.UpdateProjectRequest) error {
+	query := `
+        UPDATE Project SET 
+            name = :name,
+            description = :description,
+            address = :address,
+            status = :status,
+            updated_at = :updated_at
+        WHERE project_id = :project_id`
 
-		p.Client = c
-		projects = append(projects, &p)
+	params := map[string]interface{}{
+		"project_id":  id,
+		"name":        req.Name,
+		"description": req.Description,
+		"address":     req.Address,
+		"status":      req.Status,
+		"updated_at":  time.Now(),
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, err
+	result, err := r.db.NamedExecContext(ctx, query, params)
+	if err != nil {
+		return fmt.Errorf("failed to update project: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("project not found")
+	}
+
+	return nil
+}
+
+func (r *projectRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM Project WHERE project_id = $1`
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete project: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+	if rows == 0 {
+		return errors.New("project not found")
+	}
+	return nil
+}
+
+func (r *projectRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Project, error) {
+	project := &models.Project{}
+	query := `SELECT * FROM Project WHERE project_id = $1`
+
+	err := r.db.GetContext(ctx, project, query, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("project not found")
+		}
+		return nil, fmt.Errorf("failed to get project: %w", err)
+	}
+
+	return project, nil
+}
+
+func (r *projectRepository) GetByIDWithClient(ctx context.Context, id uuid.UUID) (*models.Project, *models.Client, error) {
+	project := &models.Project{}
+	client := &models.Client{}
+
+	query := `
+        SELECT 
+            p.*,
+            c.client_id as "client.client_id",
+            c.name as "client.name",
+            c.email as "client.email",
+            c.tel as "client.tel",
+            c.address as "client.address",
+            c.tax_id as "client.tax_id"
+        FROM Project p
+        LEFT JOIN Client c ON p.client_id = c.client_id
+        WHERE p.project_id = $1`
+
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&project.ProjectID, &project.Name, &project.Description,
+		&project.Address, &project.Status, &project.ClientID,
+		&project.CreatedAt, &project.UpdatedAt,
+		&client.ClientID, &client.Name, &client.Email,
+		&client.Tel, &client.Address, &client.TaxID,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, errors.New("project not found")
+		}
+		return nil, nil, fmt.Errorf("failed to get project with client: %w", err)
+	}
+
+	return project, client, nil
+}
+
+func (r *projectRepository) List(ctx context.Context) ([]models.Project, error) {
+	var projects []models.Project
+
+	query := `
+		SELECT * FROM Project 
+	`
+
+	err := r.db.SelectContext(ctx, &projects, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
 	}
 
 	return projects, nil
-}
-
-func nullStringToNullableUUID(ns sql.NullString) responses.NullableUUID {
-	if !ns.Valid {
-		return responses.NullableUUID{Valid: false}
-	}
-	id, err := uuid.Parse(ns.String)
-	if err != nil {
-		return responses.NullableUUID{Valid: false}
-	}
-	return responses.NullableUUID{UUID: id, Valid: true}
-}
-
-func (pr *projectRepository) GetProjectByID(ctx context.Context, id uuid.UUID) (*models.Project, error) {
-	var project models.Project
-	err := pr.db.GetContext(ctx, &project, `SELECT * FROM Project WHERE project_id = $1`, id)
-	return &project, err
-}
-
-func (pr *projectRepository) UpdateProject(ctx context.Context, project *models.Project) error {
-	query := `UPDATE Project SET name = :name, description = :description, status = :status, contract_url = :contract_url,
-			  start_date = :start_date, end_date = :end_date, updated_at = :updated_at
-			  WHERE project_id = :project_id`
-
-	_, err := pr.db.NamedExecContext(ctx, query, project)
-	return err
-}
-
-func (pr *projectRepository) DeleteProject(ctx context.Context, id uuid.UUID) error {
-	_, err := pr.db.ExecContext(ctx, `DELETE FROM Project WHERE project_id = $1`, id)
-	return err
 }

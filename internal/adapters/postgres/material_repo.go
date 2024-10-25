@@ -3,8 +3,14 @@ package postgres
 import (
 	"boonkosang/internal/domain/models"
 	"boonkosang/internal/repositories"
+	"boonkosang/internal/requests"
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -18,49 +24,119 @@ func NewMaterialRepository(db *sqlx.DB) repositories.MaterialRepository {
 	}
 }
 
-func (mr *materialRepository) CreateMaterial(ctx context.Context, material *models.Material) error {
-	query := `INSERT INTO Material (name, type, unit_of_measure, created_at, updated_at)
-			  VALUES (:name, :type, :unit_of_measure, :created_at, :updated_at)`
+func (r *materialRepository) Create(ctx context.Context, req requests.CreateMaterialRequest) (*models.Material, error) {
+	material := &models.Material{
+		MaterialID: uuid.New().String(),
+		Name:       req.Name,
+		Unit:       req.Unit,
+	}
 
-	_, err := mr.db.NamedExecContext(ctx, query, material)
-	return err
+	query := `
+        INSERT INTO Material (
+            material_id, name, unit
+        ) VALUES (
+            :material_id, :name, :unit
+        ) RETURNING *`
+
+	rows, err := r.db.NamedQueryContext(ctx, query, material)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			return nil, errors.New("material ID already exists")
+		}
+		return nil, fmt.Errorf("failed to create material: %w", err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		err = rows.StructScan(material)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan material: %w", err)
+		}
+		return material, nil
+	}
+	return nil, errors.New("failed to create material: no rows returned")
 }
 
-func (mr *materialRepository) ListMaterials(ctx context.Context) ([]*models.Material, error) {
-	var materials []*models.Material
-	err := mr.db.SelectContext(ctx, &materials, `SELECT * FROM Material`)
-	return materials, err
+func (r *materialRepository) Update(ctx context.Context, materialID string, req requests.UpdateMaterialRequest) error {
+	query := `
+        UPDATE Material SET 
+            name = :name,
+            unit = :unit
+        WHERE material_id = :material_id`
+
+	params := map[string]interface{}{
+		"material_id": materialID,
+		"name":        req.Name,
+		"unit":        req.Unit,
+	}
+
+	result, err := r.db.NamedExecContext(ctx, query, params)
+	if err != nil {
+		return fmt.Errorf("failed to update material: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("material not found")
+	}
+
+	return nil
 }
 
-func (mr *materialRepository) GetMaterialByName(ctx context.Context, name string) (*models.Material, error) {
-	var material models.Material
-	err := mr.db.GetContext(ctx, &material, `SELECT * FROM Material WHERE name = $1`, name)
-	return &material, err
+func (r *materialRepository) Delete(ctx context.Context, materialID string) error {
+	query := `DELETE FROM Material WHERE material_id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, materialID)
+	if err != nil {
+		if strings.Contains(err.Error(), "foreign key constraint") {
+			return errors.New("material is in use and cannot be deleted")
+		}
+		return fmt.Errorf("failed to delete material: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("material not found")
+	}
+
+	return nil
 }
 
-func (mr *materialRepository) UpdateMaterial(ctx context.Context, material *models.Material) error {
-	query := `UPDATE Material SET type = :type, unit_of_measure = :unit_of_measure, updated_at = :updated_at
-			  WHERE name = :name`
+func (r *materialRepository) GetByID(ctx context.Context, materialID string) (*models.Material, error) {
+	material := &models.Material{}
+	query := `SELECT * FROM Material WHERE material_id = $1`
 
-	_, err := mr.db.NamedExecContext(ctx, query, material)
-	return err
+	err := r.db.GetContext(ctx, material, query, materialID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("material not found")
+		}
+		return nil, fmt.Errorf("failed to get material: %w", err)
+	}
+
+	return material, nil
 }
 
-func (mr *materialRepository) DeleteMaterial(ctx context.Context, name string) error {
-	_, err := mr.db.ExecContext(ctx, `DELETE FROM Material WHERE name = $1`, name)
-	return err
-}
+func (r *materialRepository) List(ctx context.Context) ([]models.Material, error) {
+	var materials []models.Material
+	var args []interface{}
 
-func (mr *materialRepository) GetMaterialPriceHistory(ctx context.Context, name string) ([]*models.MaterialPriceLog, error) {
-	var priceHistory []*models.MaterialPriceLog
-	query := `SELECT * FROM Material_price_log WHERE material_name = $1 ORDER BY created_at DESC`
-	err := mr.db.SelectContext(ctx, &priceHistory, query, name)
-	return priceHistory, err
-}
+	query := `
+		SELECT * FROM Material
+	   `
 
-func (mr *materialRepository) MaterialExists(ctx context.Context, name string) (bool, error) {
-	var exists bool
-	query := "SELECT EXISTS(SELECT 1 FROM Material WHERE name = $1)"
-	err := mr.db.GetContext(ctx, &exists, query, name)
-	return exists, err
+	err := r.db.SelectContext(ctx, &materials, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list materials: %w", err)
+	}
+
+	return materials, nil
 }

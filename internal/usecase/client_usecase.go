@@ -1,21 +1,21 @@
 package usecase
 
 import (
-	"boonkosang/internal/domain/models"
 	"boonkosang/internal/repositories"
 	"boonkosang/internal/requests"
+	"boonkosang/internal/responses"
 	"context"
-	"time"
+	"errors"
 
 	"github.com/google/uuid"
 )
 
 type ClientUsecase interface {
-	CreateClient(ctx context.Context, req requests.CreateClientRequest) (*models.Client, error)
-	ListClients(ctx context.Context) ([]*models.Client, error)
-	GetClient(ctx context.Context, id uuid.UUID) (*models.Client, error)
-	UpdateClient(ctx context.Context, id uuid.UUID, req requests.UpdateClientRequest) (*models.Client, error)
-	DeleteClient(ctx context.Context, id uuid.UUID) error
+	Create(ctx context.Context, req requests.CreateClientRequest) (*responses.ClientResponse, error)
+	Update(ctx context.Context, id uuid.UUID, req requests.UpdateClientRequest) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	GetByID(ctx context.Context, id uuid.UUID) (*responses.ClientResponse, error)
+	List(ctx context.Context, page, pageSize int) (*responses.ClientListResponse, error)
 }
 
 type clientUsecase struct {
@@ -28,70 +28,94 @@ func NewClientUsecase(clientRepo repositories.ClientRepository) ClientUsecase {
 	}
 }
 
-func (cu *clientUsecase) CreateClient(ctx context.Context, req requests.CreateClientRequest) (*models.Client, error) {
-	client := &models.Client{
-		ClientID:      uuid.New(),
-		CompanyName:   req.CompanyName,
-		ContactPerson: req.ContactPerson,
-		Email:         req.Email,
-		Phone:         req.Phone,
-		Address:       req.Address,
-		TaxID:         req.TaxID,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+func (u *clientUsecase) Create(ctx context.Context, req requests.CreateClientRequest) (*responses.ClientResponse, error) {
+	// Check if client with email already exists
+	existing, err := u.clientRepo.GetByEmail(ctx, req.Email)
+	if err == nil && existing != nil {
+		return nil, errors.New("client with this email already exists")
 	}
 
-	err := cu.clientRepo.CreateClient(ctx, client)
+	client, err := u.clientRepo.Create(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return client, nil
+	return &responses.ClientResponse{
+		ID:      client.ClientID,
+		Name:    client.Name,
+		Email:   client.Email,
+		Tel:     client.Tel,
+		Address: client.Address,
+		TaxID:   client.TaxID,
+	}, nil
 }
 
-func (cu *clientUsecase) ListClients(ctx context.Context) ([]*models.Client, error) {
-	return cu.clientRepo.ListClients(ctx)
+func (u *clientUsecase) Update(ctx context.Context, id uuid.UUID, req requests.UpdateClientRequest) error {
+	// Check if client exists
+	existing, err := u.clientRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Check if new email conflicts with another client
+	if existing.Email != req.Email {
+		client, err := u.clientRepo.GetByEmail(ctx, req.Email)
+		if err == nil && client != nil {
+			return errors.New("client with this email already exists")
+		}
+	}
+
+	return u.clientRepo.Update(ctx, id, req)
 }
 
-func (cu *clientUsecase) GetClient(ctx context.Context, id uuid.UUID) (*models.Client, error) {
-	return cu.clientRepo.GetClientByID(ctx, id)
+func (u *clientUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	return u.clientRepo.Delete(ctx, id)
 }
 
-func (cu *clientUsecase) UpdateClient(ctx context.Context, id uuid.UUID, req requests.UpdateClientRequest) (*models.Client, error) {
-	client, err := cu.clientRepo.GetClientByID(ctx, id)
+func (u *clientUsecase) GetByID(ctx context.Context, id uuid.UUID) (*responses.ClientResponse, error) {
+	client, err := u.clientRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Update fields
-	if req.CompanyName != "" {
-		client.CompanyName = req.CompanyName
-	}
-	if req.ContactPerson != "" {
-		client.ContactPerson = req.ContactPerson
-	}
-	if req.Email != "" {
-		client.Email = req.Email
-	}
-	if req.Phone != "" {
-		client.Phone = req.Phone
-	}
-	if req.Address != "" {
-		client.Address = req.Address
-	}
-	if req.TaxID != "" {
-		client.TaxID = req.TaxID
-	}
-	client.UpdatedAt = time.Now()
+	return &responses.ClientResponse{
+		ID:      client.ClientID,
+		Name:    client.Name,
+		Email:   client.Email,
+		Tel:     client.Tel,
+		Address: client.Address,
+		TaxID:   client.TaxID,
+	}, nil
+}
 
-	err = cu.clientRepo.UpdateClient(ctx, client)
+func (u *clientUsecase) List(ctx context.Context, page, pageSize int) (*responses.ClientListResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	offset := (page - 1) * pageSize
+	clients, total, err := u.clientRepo.List(ctx, pageSize, offset)
 	if err != nil {
 		return nil, err
 	}
 
-	return client, nil
-}
+	clientResponses := make([]responses.ClientResponse, len(clients))
+	for i, client := range clients {
+		clientResponses[i] = responses.ClientResponse{
+			ID:      client.ClientID,
+			Name:    client.Name,
+			Email:   client.Email,
+			Tel:     client.Tel,
+			Address: client.Address,
+			TaxID:   client.TaxID,
+		}
+	}
 
-func (cu *clientUsecase) DeleteClient(ctx context.Context, id uuid.UUID) error {
-	return cu.clientRepo.DeleteClient(ctx, id)
+	return &responses.ClientListResponse{
+		Clients: clientResponses,
+		Total:   total,
+	}, nil
 }

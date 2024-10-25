@@ -49,25 +49,25 @@ func main() {
 	UserHandler := rest.NewUserHandler(userUseCase)
 	UserHandler.UserRoutes(app)
 
-	projectRepo := postgres.NewProjectRepository(db)
-	projectUseCase := usecase.NewProjectUsecase(projectRepo)
-	projectHandler := rest.NewProjectHandler(projectUseCase)
-	projectHandler.ProjectRoutes(app)
-
 	clientRepo := postgres.NewClientRepository(db)
 	clientUseCase := usecase.NewClientUsecase(clientRepo)
-	clientHandler := rest.NewClientHandler(clientUseCase)
-	clientHandler.ClientRoutes(app)
+	ClientHandler := rest.NewClientHandler(clientUseCase)
+	ClientHandler.ClientRoutes(app)
+
+	supplierRepo := postgres.NewSupplierRepository(db)
+	supplierUseCase := usecase.NewSupplierUsecase(supplierRepo)
+	SupplierHandler := rest.NewSupplierHandler(supplierUseCase)
+	SupplierHandler.SupplierRoutes(app)
+
+	projectRepo := postgres.NewProjectRepository(db)
+	projectUseCase := usecase.NewProjectUsecase(projectRepo, clientRepo)
+	ProjectHandler := rest.NewProjectHandler(projectUseCase)
+	ProjectHandler.ProjectRoutes(app)
 
 	materialRepo := postgres.NewMaterialRepository(db)
-	materialUseCase := usecase.NewMaterialUsecase(materialRepo)
-	materialHandler := rest.NewMaterialHandler(materialUseCase)
-	materialHandler.MaterialRoutes(app)
-
-	jobRepo := postgres.NewJobRepository(db)
-	jobUseCase := usecase.NewJobUsecase(jobRepo, materialRepo)
-	jobHandler := rest.NewJobHandler(jobUseCase)
-	jobHandler.JobRoutes(app)
+	materialUseCase := usecase.NewMaterialUsecase(materialRepo, supplierRepo)
+	MaterialHandler := rest.NewMaterialHandler(materialUseCase)
+	MaterialHandler.MaterialRoutes(app)
 
 	port := getEnv("PORT", "8004")
 	if err := app.Listen(":" + port); err != nil {
@@ -75,7 +75,6 @@ func main() {
 	}
 }
 
-// Helper function to read an environment variable or return a default value
 func getEnv(key, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
@@ -83,7 +82,6 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-// Helper function to read an environment variable as an integer or return a default value
 func getEnvAsInt(key string, defaultValue int) int {
 	valueStr := getEnv(key, "")
 	if value, err := strconv.Atoi(valueStr); err == nil {
@@ -92,7 +90,6 @@ func getEnvAsInt(key string, defaultValue int) int {
 	return defaultValue
 }
 
-// Helper function to read an environment variable as a duration or return a default value
 func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 	valueStr := getEnv(key, "")
 	if value, err := time.ParseDuration(valueStr); err == nil {

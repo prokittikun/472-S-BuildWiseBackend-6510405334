@@ -1,52 +1,33 @@
 package responses
 
-import (
-	"boonkosang/internal/domain/models"
-	"time"
-
-	"github.com/google/uuid"
-)
+import "github.com/google/uuid"
 
 type JobMaterialResponse struct {
-	MaterialName  string  `json:"material_name"`
-	Quantity      float64 `json:"quantity"`
-	Type          string  `json:"type"`
-	UnitOfMeasure string  `json:"unit_of_measure"`
+	MaterialID string   `json:"material_id"`
+	Name       string   `json:"name"`
+	Unit       string   `json:"unit"`
+	Quantity   float64  `json:"quantity"`
+	LastPrice  *float64 `json:"last_price,omitempty"`
 }
 
 type JobResponse struct {
-	JobID       uuid.UUID             `json:"job_id"`
+	ID          uuid.UUID             `json:"id"`
+	Name        string                `json:"name"`
 	Description string                `json:"description"`
-	CreatedAt   time.Time             `json:"created_at"`
-	UpdatedAt   time.Time             `json:"updated_at"`
+	Unit        string                `json:"unit"`
 	Materials   []JobMaterialResponse `json:"materials"`
 }
 
-func NewJobResponse(job *models.Job) JobResponse {
-	materials := make([]JobMaterialResponse, len(job.Materials))
-	for i, m := range job.Materials {
-		materials[i] = JobMaterialResponse{
-			MaterialName:  m.MaterialName,
-			Quantity:      m.Quantity,
-			Type:          m.Type,
-			UnitOfMeasure: m.UnitOfMeasure,
-		}
-	}
-
-	return JobResponse{
-		JobID:       job.JobID,
-		Description: job.Description,
-		CreatedAt:   job.CreatedAt,
-		UpdatedAt:   job.UpdatedAt,
-		Materials:   materials,
-	}
+type JobListResponse struct {
+	Jobs  []JobResponse `json:"jobs"`
+	Total int64         `json:"total"`
 }
 
-func NewUpdateJobResponse(job *models.Job) JobResponse {
-	return JobResponse{
-		JobID:       job.JobID,
-		Description: job.Description,
-		CreatedAt:   job.CreatedAt,
-		UpdatedAt:   job.UpdatedAt,
-	}
+type BOQJobResponse struct {
+	JobID        uuid.UUID `json:"job_id"`
+	Name         string    `json:"name"`
+	Unit         string    `json:"unit"`
+	Quantity     int       `json:"quantity"`
+	LaborCost    float64   `json:"labor_cost"`
+	SellingPrice float64   `json:"selling_price"`
 }

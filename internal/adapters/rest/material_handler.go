@@ -1,8 +1,8 @@
+// rest/material_handler.go
 package rest
 
 import (
 	"boonkosang/internal/requests"
-	"boonkosang/internal/responses"
 	"boonkosang/internal/usecase"
 
 	"github.com/gofiber/fiber/v2"
@@ -19,101 +19,154 @@ func NewMaterialHandler(materialUsecase usecase.MaterialUsecase) *MaterialHandle
 }
 
 func (h *MaterialHandler) MaterialRoutes(app *fiber.App) {
-	app.Post("/materials", h.CreateMaterial)
-	app.Get("/materials", h.ListMaterials)
-	app.Get("/materials/:name", h.GetMaterial)
-	app.Put("/materials/:name", h.UpdateMaterial)
-	app.Delete("/materials/:name", h.DeleteMaterial)
-	app.Get("/materials/:name/price-history", h.GetMaterialPriceHistory)
+	material := app.Group("/materials")
+
+	material.Post("/", h.Create)
+	material.Get("/", h.List)
+	material.Get("/:id", h.GetByID)
+	material.Put("/:id", h.Update)
+	material.Delete("/:id", h.Delete)
+
 }
 
-func (h *MaterialHandler) CreateMaterial(c *fiber.Ctx) error {
+func (h *MaterialHandler) Create(c *fiber.Ctx) error {
 	var req requests.CreateMaterialRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
-	}
 
-	material, err := h.materialUsecase.CreateMaterial(c.Context(), req)
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+	material, err := h.materialUsecase.Create(c.Context(), req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create material"})
+		switch err.Error() {
+		case "material ID already exists":
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to create material",
+			})
+		}
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Material created successfully",
-		"data":    responses.CreateMaterialResponse(*material),
+		"data":    material,
 	})
 }
 
-func (h *MaterialHandler) ListMaterials(c *fiber.Ctx) error {
-	materials, err := h.materialUsecase.ListMaterials(c.Context())
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch materials"})
-	}
+func (h *MaterialHandler) List(c *fiber.Ctx) error {
 
-	materialsResponse := make([]responses.MaterialResponse, len(materials))
-	for i, material := range materials {
-		materialsResponse[i] = responses.MaterialResponse(*material)
+	response, err := h.materialUsecase.List(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve materials",
+		})
 	}
 
 	return c.JSON(fiber.Map{
-		"data": materialsResponse,
+		"message": "Materials retrieved successfully",
+		"data":    response,
 	})
 }
 
-func (h *MaterialHandler) GetMaterial(c *fiber.Ctx) error {
-	name := c.Params("name")
+func (h *MaterialHandler) GetByID(c *fiber.Ctx) error {
+	materialID := c.Params("id")
+	if materialID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Material ID is required",
+		})
+	}
 
-	material, err := h.materialUsecase.GetMaterial(c.Context(), name)
+	material, err := h.materialUsecase.GetByID(c.Context(), materialID)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Material not found"})
+		switch err.Error() {
+		case "material not found":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Material not found",
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to retrieve material",
+			})
+		}
 	}
 
 	return c.JSON(fiber.Map{
-		"data": responses.MaterialResponse(*material),
+		"message": "Material retrieved successfully",
+		"data":    material,
 	})
 }
 
-func (h *MaterialHandler) UpdateMaterial(c *fiber.Ctx) error {
-	name := c.Params("name")
+func (h *MaterialHandler) Update(c *fiber.Ctx) error {
+	materialID := c.Params("id")
+	if materialID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Material ID is required",
+		})
+	}
 
 	var req requests.UpdateMaterialRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
 	}
 
-	material, err := h.materialUsecase.UpdateMaterial(c.Context(), name, req)
+	if req.Name == "" || req.Unit == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Missing required fields",
+		})
+	}
+
+	err := h.materialUsecase.Update(c.Context(), materialID, req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update material"})
+		switch err.Error() {
+		case "material not found":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Material not found",
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update material",
+			})
+		}
 	}
 
 	return c.JSON(fiber.Map{
 		"message": "Material updated successfully",
-		"data":    responses.UpdateMaterialResponse(*material),
 	})
 }
 
-func (h *MaterialHandler) DeleteMaterial(c *fiber.Ctx) error {
-	name := c.Params("name")
+func (h *MaterialHandler) Delete(c *fiber.Ctx) error {
+	materialID := c.Params("id")
+	if materialID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Material ID is required",
+		})
+	}
 
-	err := h.materialUsecase.DeleteMaterial(c.Context(), name)
+	err := h.materialUsecase.Delete(c.Context(), materialID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete material"})
+		switch err.Error() {
+		case "material not found":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Material not found",
+			})
+		case "material is in use and cannot be deleted":
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to delete material",
+			})
+		}
 	}
 
 	return c.JSON(fiber.Map{
 		"message": "Material deleted successfully",
-	})
-}
-
-func (h *MaterialHandler) GetMaterialPriceHistory(c *fiber.Ctx) error {
-	name := c.Params("name")
-
-	priceHistory, err := h.materialUsecase.GetMaterialPriceHistory(c.Context(), name)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch price history"})
-	}
-
-	return c.JSON(fiber.Map{
-		"data": priceHistory,
 	})
 }

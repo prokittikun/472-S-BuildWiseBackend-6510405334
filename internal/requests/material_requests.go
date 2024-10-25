@@ -1,12 +1,11 @@
 package requests
 
 type CreateMaterialRequest struct {
-	Name          string `json:"name"`
-	Type          string `json:"type"`
-	UnitOfMeasure string `json:"unit_of_measure"`
+	Name string `json:"name" validate:"required"`
+	Unit string `json:"unit" validate:"required"`
 }
 
 type UpdateMaterialRequest struct {
-	Type          string `json:"type"`
-	UnitOfMeasure string `json:"unit_of_measure"`
+	Name string `json:"name" validate:"required"`
+	Unit string `json:"unit" validate:"required"`
 }

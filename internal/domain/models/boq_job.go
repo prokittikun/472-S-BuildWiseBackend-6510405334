@@ -5,8 +5,9 @@ import (
 )
 
 type BOQJob struct {
-	BID       uuid.UUID `db:"b_id"`
-	JobID     uuid.UUID `db:"job_id"`
-	Unit      int       `db:"unit"`
-	LaborCost float64   `db:"labor_cost"`
+	BOQID        uuid.UUID `db:"boq_id"`
+	JobID        uuid.UUID `db:"job_id"`
+	Quantity     int       `db:"quantity"`
+	LaborCost    float64   `db:"labor_cost"`
+	SellingPrice float64   `db:"selling_price"`
 }

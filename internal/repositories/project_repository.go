@@ -2,16 +2,17 @@ package repositories
 
 import (
 	"boonkosang/internal/domain/models"
-	"boonkosang/internal/responses"
+	"boonkosang/internal/requests"
 	"context"
 
 	"github.com/google/uuid"
 )
 
 type ProjectRepository interface {
-	CreateProject(ctx context.Context, project *models.Project) error
-	ListProjects(ctx context.Context) ([]*responses.ProjectResponse, error)
-	GetProjectByID(ctx context.Context, id uuid.UUID) (*models.Project, error)
-	UpdateProject(ctx context.Context, project *models.Project) error
-	DeleteProject(ctx context.Context, id uuid.UUID) error
+	Create(ctx context.Context, req requests.CreateProjectRequest) (*models.Project, error)
+	Update(ctx context.Context, id uuid.UUID, req requests.UpdateProjectRequest) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	GetByID(ctx context.Context, id uuid.UUID) (*models.Project, error)
+	GetByIDWithClient(ctx context.Context, id uuid.UUID) (*models.Project, *models.Client, error)
+	List(ctx context.Context) ([]models.Project, error)
 }

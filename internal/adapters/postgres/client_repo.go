@@ -3,7 +3,12 @@ package postgres
 import (
 	"boonkosang/internal/domain/models"
 	"boonkosang/internal/repositories"
+	"boonkosang/internal/requests"
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -19,36 +24,150 @@ func NewClientRepository(db *sqlx.DB) repositories.ClientRepository {
 	}
 }
 
-func (cr *clientRepository) CreateClient(ctx context.Context, client *models.Client) error {
-	query := `INSERT INTO Client (client_id, company_name, contact_person, email, phone, address, tax_id, created_at, updated_at)
-			  VALUES (:client_id, :company_name, :contact_person, :email, :phone, :address, :tax_id, :created_at, :updated_at)`
+func (r *clientRepository) Create(ctx context.Context, req requests.CreateClientRequest) (*models.Client, error) {
+	client := &models.Client{
+		ClientID: uuid.New(),
+		Name:     req.Name,
+		Email:    req.Email,
+		Tel:      req.Tel,
+		Address:  req.Address,
+		TaxID:    req.TaxID,
+	}
 
-	_, err := cr.db.NamedExecContext(ctx, query, client)
-	return err
+	query := `
+        INSERT INTO Client (
+            client_id, name, email, tel, address, tax_id
+          
+        ) VALUES (
+            :client_id, :name, :email, :tel, :address, :tax_id
+        ) RETURNING *`
+
+	rows, err := r.db.NamedQueryContext(ctx, query, client)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			return nil, errors.New("client with this email already exists")
+		}
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		err = rows.StructScan(client)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan client: %w", err)
+		}
+		return client, nil
+	}
+	return nil, errors.New("failed to create client: no rows returned")
 }
 
-func (cr *clientRepository) ListClients(ctx context.Context) ([]*models.Client, error) {
-	var clients []*models.Client
-	err := cr.db.SelectContext(ctx, &clients, `SELECT * FROM Client`)
-	return clients, err
+func (r *clientRepository) Update(ctx context.Context, id uuid.UUID, req requests.UpdateClientRequest) error {
+	query := `
+        UPDATE Client SET 
+            name = :name,
+            email = :email,
+            tel = :tel,
+            address = :address,
+            tax_id = :tax_id
+        WHERE client_id = :client_id`
+
+	params := map[string]interface{}{
+		"client_id": id,
+		"name":      req.Name,
+		"email":     req.Email,
+		"tel":       req.Tel,
+		"address":   req.Address,
+		"tax_id":    req.TaxID,
+	}
+
+	result, err := r.db.NamedExecContext(ctx, query, params)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			return errors.New("client with this email already exists")
+		}
+		return fmt.Errorf("failed to update client: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("client not found")
+	}
+
+	return nil
 }
 
-func (cr *clientRepository) GetClientByID(ctx context.Context, id uuid.UUID) (*models.Client, error) {
-	var client models.Client
-	err := cr.db.GetContext(ctx, &client, `SELECT * FROM Client WHERE client_id = $1`, id)
-	return &client, err
+func (r *clientRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM Client WHERE client_id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete client: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("client not found")
+	}
+
+	return nil
 }
 
-func (cr *clientRepository) UpdateClient(ctx context.Context, client *models.Client) error {
-	query := `UPDATE Client SET company_name = :company_name, contact_person = :contact_person, email = :email,
-			  phone = :phone, address = :address, tax_id = :tax_id, updated_at = :updated_at
-			  WHERE client_id = :client_id`
+func (r *clientRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Client, error) {
+	client := &models.Client{}
+	query := `SELECT * FROM Client WHERE client_id = $1`
 
-	_, err := cr.db.NamedExecContext(ctx, query, client)
-	return err
+	err := r.db.GetContext(ctx, client, query, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("client not found")
+		}
+		return nil, fmt.Errorf("failed to get client: %w", err)
+	}
+
+	return client, nil
 }
 
-func (cr *clientRepository) DeleteClient(ctx context.Context, id uuid.UUID) error {
-	_, err := cr.db.ExecContext(ctx, `DELETE FROM Client WHERE client_id = $1`, id)
-	return err
+func (r *clientRepository) GetByEmail(ctx context.Context, email string) (*models.Client, error) {
+	client := &models.Client{}
+	query := `SELECT * FROM Client WHERE email = $1`
+
+	err := r.db.GetContext(ctx, client, query, email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("client not found")
+		}
+		return nil, fmt.Errorf("failed to get client: %w", err)
+	}
+
+	return client, nil
+}
+
+func (r *clientRepository) List(ctx context.Context, limit, offset int) ([]models.Client, int64, error) {
+	var clients []models.Client
+	var total int64
+
+	countQuery := `SELECT COUNT(*) FROM Client`
+	err := r.db.GetContext(ctx, &total, countQuery)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %w", err)
+	}
+
+	query := `
+        SELECT * FROM Client 
+        LIMIT $1 OFFSET $2`
+
+	err = r.db.SelectContext(ctx, &clients, query, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list clients: %w", err)
+	}
+
+	return clients, total, nil
 }

@@ -1,16 +1,21 @@
 package models
 
 import (
-	"time"
+	"database/sql"
 
 	"github.com/google/uuid"
 )
 
+type BOQStatus string
+
+const (
+	BOQStatusDraft    BOQStatus = "draft"
+	BOQStatusApproved BOQStatus = "approved"
+)
+
 type BOQ struct {
-	BID          uuid.UUID `db:"b_id"`
-	ProjectID    uuid.UUID `db:"project_id"`
-	Status       string    `db:"status"`
-	CompleteStep int       `db:"complete_step"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
+	BOQID              uuid.UUID       `db:"boq_id"`
+	ProjectID          uuid.UUID       `db:"project_id"`
+	Status             BOQStatus       `db:"status"`
+	SellingGeneralCost sql.NullFloat64 `db:"selling_general_cost"`
 }

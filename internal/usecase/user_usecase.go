@@ -7,6 +7,7 @@ import (
 	"boonkosang/internal/responses"
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -14,8 +15,8 @@ import (
 )
 
 type UserUsecase interface {
-	Login(context.Context, requests.LoginRequest) (*responses.UserResponse, string, error)
-	Register(context.Context, requests.RegisterRequest) error
+	Login(ctx context.Context, req requests.LoginRequest) (*responses.LoginResponse, error) // Changed return type
+	Register(ctx context.Context, req requests.RegisterRequest) error
 }
 
 type userUsecase struct {
@@ -45,20 +46,20 @@ func (uu *userUsecase) generateToken(user *models.User) (string, error) {
 func (uu *userUsecase) Login(
 	ctx context.Context,
 	loginRequest requests.LoginRequest,
-) (*responses.UserResponse, string, error) {
+) (*responses.LoginResponse, error) {
 	user, err := uu.userRepo.GetByUsername(ctx, loginRequest.Username)
 	if err != nil {
-		return nil, "", err
+		return nil, fmt.Errorf("user not found: %w", err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginRequest.Password))
 	if err != nil {
-		return nil, "", errors.New("invalid credentials")
+		return nil, errors.New("invalid credentials")
 	}
 
 	token, err := uu.generateToken(user)
 	if err != nil {
-		return nil, "", err
+		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
 
 	userResponse := &responses.UserResponse{
@@ -66,12 +67,15 @@ func (uu *userUsecase) Login(
 		Username:  user.Username,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
-		Email:     user.Email,
-		Tel:       user.Tel,
+		Email:     user.Email.String,
+		Tel:       user.Tel.String,
 	}
-	return userResponse, token, nil
-}
 
+	return &responses.LoginResponse{
+		AccessToken: token,
+		User:        *userResponse,
+	}, nil
+}
 func (uu *userUsecase) Register(
 	ctx context.Context,
 	registerRequest requests.RegisterRequest,

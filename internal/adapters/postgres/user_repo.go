@@ -5,8 +5,10 @@ import (
 	"boonkosang/internal/repositories"
 	"boonkosang/internal/requests"
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
-	"time"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -24,9 +26,13 @@ func NewUserRepository(db *sqlx.DB) repositories.UserRepository {
 
 func (ur *userRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
 	user := &models.User{}
-	err := ur.db.GetContext(ctx, user, `SELECT * FROM  "User" WHERE username = $1`, username)
+	query := `SELECT * FROM "User" WHERE username = $1`
+	err := ur.db.GetContext(ctx, user, query, username)
 	if err != nil {
-		return nil, err
+		if err == sql.ErrNoRows {
+			return nil, errors.New("user not found")
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	return user, nil
 }
@@ -38,29 +44,24 @@ func (ur *userRepository) CreateUser(ctx context.Context, req requests.RegisterR
 		Password:  req.Password,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
-		Email:     req.Email,
-		Tel:       req.Tel,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Email:     sql.NullString{String: req.Email, Valid: req.Email != ""},
+		Tel:       sql.NullString{String: req.Tel, Valid: req.Tel != ""},
 	}
 
-	query := `INSERT INTO "User" (user_id, username, password, first_name, last_name, email, tel, created_at, updated_at)
-			  VALUES (:user_id, :username, :password, :first_name, :last_name, :email, :tel, :created_at, :updated_at)`
+	query := `
+        INSERT INTO "User" (
+            user_id, username, password, first_name, last_name, 
+            email, tel
+        ) VALUES (
+            :user_id, :username, :password, :first_name, :last_name, 
+            :email, :tel
+        )`
 
-	_, err := ur.db.NamedExecContext(ctx, query,
-		map[string]interface{}{
-			"user_id":    user.UserID,
-			"username":   user.Username,
-			"password":   user.Password,
-			"first_name": user.FirstName,
-			"last_name":  user.LastName,
-			"email":      user.Email,
-			"tel":        user.Tel,
-			"created_at": user.CreatedAt,
-			"updated_at": user.UpdatedAt,
-		},
-	)
+	_, err := ur.db.NamedExecContext(ctx, query, user)
 	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			return errors.New("username already exists")
+		}
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 	return nil

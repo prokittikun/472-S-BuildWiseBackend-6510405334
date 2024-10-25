@@ -1,19 +1,19 @@
 package requests
 
+import "encoding/json"
+
 type CreateClientRequest struct {
-	CompanyName   string `json:"company_name" validate:"required"`
-	ContactPerson string `json:"contact_person" validate:"required"`
-	Email         string `json:"email" validate:"required,email"`
-	Phone         string `json:"phone" validate:"omitempty"`
-	Address       string `json:"address" validate:"omitempty"`
-	TaxID         string `json:"tax_id" validate:"omitempty"`
+	Name    string          `json:"name" validate:"required"`
+	Email   string          `json:"email" validate:"required,email"`
+	Tel     string          `json:"tel" validate:"required,len=10"`
+	Address json.RawMessage `json:"address" validate:"required"`
+	TaxID   string          `json:"tax_id" validate:"required,len=13"`
 }
 
 type UpdateClientRequest struct {
-	CompanyName   string `json:"company_name" validate:"omitempty"`
-	ContactPerson string `json:"contact_person" validate:"omitempty"`
-	Email         string `json:"email" validate:"omitempty,email"`
-	Phone         string `json:"phone" validate:"omitempty"`
-	Address       string `json:"address" validate:"omitempty"`
-	TaxID         string `json:"tax_id" validate:"omitempty"`
+	Name    string          `json:"name" validate:"required"`
+	Email   string          `json:"email" validate:"required,email"`
+	Tel     string          `json:"tel" validate:"required,len=10"`
+	Address json.RawMessage `json:"address" validate:"required"`
+	TaxID   string          `json:"tax_id" validate:"required,len=13"`
 }

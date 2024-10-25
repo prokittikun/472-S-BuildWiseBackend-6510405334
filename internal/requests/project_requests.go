@@ -1,22 +1,21 @@
 package requests
 
 import (
-	"time"
+	"encoding/json"
+
+	"github.com/google/uuid"
 )
 
 type CreateProjectRequest struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	ContractURL string    `json:"contract_url"`
-	StartDate   time.Time `json:"start_date"`
-	EndDate     time.Time `json:"end_date"`
+	Name        string          `json:"name" validate:"required"`
+	Description string          `json:"description" validate:"required"`
+	Address     json.RawMessage `json:"address" validate:"required"`
+	ClientID    uuid.UUID       `json:"client_id" validate:"required"`
 }
 
 type UpdateProjectRequest struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Status      string    `json:"status"`
-	ContractURL string    `json:"contract_url"`
-	StartDate   time.Time `json:"start_date"`
-	EndDate     time.Time `json:"end_date"`
+	Name        string          `json:"name" validate:"required"`
+	Description string          `json:"description" validate:"required"`
+	Address     json.RawMessage `json:"address" validate:"required"`
+	Status      string          `json:"status" validate:"required,oneof=planning in_progress completed cancelled"`
 }
