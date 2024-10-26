@@ -73,6 +73,11 @@ func main() {
 	MaterialHandler := rest.NewMaterialHandler(materialUseCase)
 	MaterialHandler.MaterialRoutes(app)
 
+	jobRepo := postgres.NewJobRepository(db)
+	jobUseCase := usecase.NewJobUseCase(jobRepo)
+	JobHandler := rest.NewJobHandler(jobUseCase)
+	JobHandler.JobRoutes(app)
+
 	port := getEnv("PORT", "8004")
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
