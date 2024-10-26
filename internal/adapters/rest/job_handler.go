@@ -4,6 +4,7 @@ import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"boonkosang/internal/usecase"
+	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -145,6 +146,8 @@ func (h *JobHandler) AddMaterial(c *fiber.Ctx) error {
 		})
 	}
 
+	fmt.Println(req)
+
 	err = h.jobUsecase.AddMaterial(c.Context(), jobID, req)
 	if err != nil {
 		switch err.Error() {
@@ -185,13 +188,9 @@ func (h *JobHandler) DeleteMaterial(c *fiber.Ctx) error {
 
 	err = h.jobUsecase.DeleteMaterial(c.Context(), jobID, materialID)
 	if err != nil {
-		if err.Error() == "job material not found" {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Job material not found",
-			})
-		}
+
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to delete material",
+			"error": err.Error(),
 		})
 	}
 

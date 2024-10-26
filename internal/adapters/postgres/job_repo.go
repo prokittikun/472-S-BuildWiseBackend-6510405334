@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -107,16 +108,14 @@ func (r *jobRepository) Update(ctx context.Context, id uuid.UUID, req requests.U
 	return nil
 }
 
-// AddJobMaterial adds new material to a job
 func (r *jobRepository) AddJobMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
-	fmt.Print("AddJobMaterial")
 
-	query := `
+	insertJobMaterialQuery := `
 		INSERT INTO Job_material (
 			job_id, material_id, quantity
 		) VALUES (
@@ -124,6 +123,25 @@ func (r *jobRepository) AddJobMaterial(ctx context.Context, jobID uuid.UUID, req
 		) ON CONFLICT (job_id, material_id) 
 		DO UPDATE SET quantity = Job_material.quantity + EXCLUDED.quantity`
 
+	getProjectsQuery := `
+		SELECT DISTINCT b.boq_id, b.status
+		FROM boq_job bj 
+		JOIN boq b ON b.boq_id = bj.boq_id 
+		JOIN project p ON p.project_id = b.project_id 
+		WHERE bj.job_id = $1`
+
+	type BOQInfo struct {
+		BOQID  uuid.UUID `db:"boq_id"`
+		Status string    `db:"status"`
+	}
+	var boqs []BOQInfo
+
+	err = tx.SelectContext(ctx, &boqs, getProjectsQuery, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to get associated projects: %w", err)
+	}
+
+	// Insert job materials
 	for _, material := range req.Materials {
 		params := map[string]interface{}{
 			"job_id":      jobID,
@@ -131,21 +149,81 @@ func (r *jobRepository) AddJobMaterial(ctx context.Context, jobID uuid.UUID, req
 			"quantity":    material.Quantity,
 		}
 
-		_, err := tx.NamedExecContext(ctx, query, params)
+		fmt.Print(params)
+
+		_, err := tx.NamedExecContext(ctx, insertJobMaterialQuery, params)
+		fmt.Print(err)
+
 		if err != nil {
+
 			return fmt.Errorf("failed to add material: %w", err)
+		}
+
+		// 14.4 For each draft BOQ, create material price log entries
+		for _, boq := range boqs {
+			if boq.Status == "draft" {
+				insertPriceLogQuery := `
+					INSERT INTO Material_price_log (
+						material_id, boq_id, supplier_id, actual_price, estimated_price, job_id, quantity, updated_at
+					) VALUES (
+						$1, $2, NULL, NULL, NULL, $3, $4, CURRENT_TIMESTAMP
+					)`
+
+				_, err = tx.ExecContext(ctx, insertPriceLogQuery, material.MaterialID, boq.BOQID, jobID, material.Quantity)
+				if err != nil {
+					return fmt.Errorf("failed to create material price log: %w", err)
+				}
+			}
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (r *jobRepository) DeleteJobMaterial(ctx context.Context, jobID uuid.UUID, materialID string) error {
-	query := `
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	checkUsageQuery := `
+		SELECT DISTINCT p.name as project_name, b.boq_id, b.status
+		FROM job_material jm 
+		JOIN boq_job bj ON bj.job_id = jm.job_id 
+		JOIN boq b ON b.boq_id = bj.boq_id 
+		JOIN project p ON p.project_id = b.project_id 
+		WHERE jm.material_id = $1`
+
+	type ProjectUsage struct {
+		ProjectName string    `db:"project_name"`
+		BOQID       uuid.UUID `db:"boq_id"`
+		Status      string    `db:"status"`
+	}
+	var usages []ProjectUsage
+
+	err = tx.SelectContext(ctx, &usages, checkUsageQuery, materialID)
+	if err != nil {
+		return fmt.Errorf("failed to check material usage: %w", err)
+	}
+	fmt.Print(usages)
+	if len(usages) > 0 {
+		var projectNames []string
+		for _, usage := range usages {
+			projectNames = append(projectNames, usage.ProjectName)
+		}
+		return fmt.Errorf("material is used in following projects: %s", strings.Join(projectNames, ", "))
+	}
+
+	deleteJobMaterialQuery := `
 		DELETE FROM Job_material 
 		WHERE job_id = $1 AND material_id = $2`
 
-	result, err := r.db.ExecContext(ctx, query, jobID, materialID)
+	result, err := tx.ExecContext(ctx, deleteJobMaterialQuery, jobID, materialID)
 	if err != nil {
 		return fmt.Errorf("failed to delete job material: %w", err)
 	}
@@ -159,10 +237,30 @@ func (r *jobRepository) DeleteJobMaterial(ctx context.Context, jobID uuid.UUID, 
 		return errors.New("job material not found")
 	}
 
+	deletePriceLogsQuery := `
+		DELETE FROM material_price_log 
+		WHERE job_id = $1 
+		AND material_id = $2 
+		AND boq_id IN (
+			SELECT b.boq_id 
+			FROM boq b 
+			JOIN boq_job bj ON b.boq_id = bj.boq_id 
+			WHERE bj.job_id = $1 
+			AND b.status = 'draft'
+		)`
+
+	_, err = tx.ExecContext(ctx, deletePriceLogsQuery, jobID, materialID)
+	if err != nil {
+		return fmt.Errorf("failed to delete material price logs: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return nil
 }
 
-// UpdateJobMaterialQuantity updates the quantity of a specific material in a job
 func (r *jobRepository) UpdateJobMaterialQuantity(ctx context.Context, jobID uuid.UUID, req requests.UpdateJobMaterialQuantityRequest) error {
 	query := `
 		UPDATE Job_material 
