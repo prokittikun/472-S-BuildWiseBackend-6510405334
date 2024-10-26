@@ -23,6 +23,7 @@ func (h *BOQHandler) BOQRoutes(app *fiber.App) {
 
 	boq.Post("/", h.Create)
 	boq.Get("/:id", h.GetByID)
+	boq.Get("/project/:project_id", h.GetBoqWithProject)
 }
 
 func (h *BOQHandler) Create(c *fiber.Ctx) error {
@@ -81,6 +82,35 @@ func (h *BOQHandler) GetByID(c *fiber.Ctx) error {
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to retrieve BOQ",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "BOQ retrieved successfully",
+		"data":    boq,
+	})
+}
+
+func (h *BOQHandler) GetBoqWithProject(c *fiber.Ctx) error {
+	project_id := c.Params("project_id")
+	if project_id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	uuid, err := uuid.Parse(project_id)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID format",
+		})
+	}
+
+	boq, err := h.boqUsecase.GetBoqWithProject(c.Context(), uuid)
+	if err != nil {
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
 		})
 	}
 

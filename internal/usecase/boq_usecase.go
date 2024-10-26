@@ -13,6 +13,7 @@ import (
 type BOQUsecase interface {
 	Create(ctx context.Context, req requests.CreateBOQRequest) (*responses.BOQResponse, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*responses.BOQResponse, error)
+	GetBoqWithProject(ctx context.Context, project_id uuid.UUID) (*responses.BOQResponse, error)
 }
 
 type boqUsecase struct {
@@ -28,11 +29,6 @@ func NewBOQUsecase(boqRepo repositories.BOQRepository, projectRepo repositories.
 }
 
 func (u *boqUsecase) Create(ctx context.Context, req requests.CreateBOQRequest) (*responses.BOQResponse, error) {
-	// Verify project exists
-	project, err := u.projectRepo.GetByID(ctx, req.ProjectID)
-	if err != nil {
-		return nil, errors.New("project not found")
-	}
 
 	// Check if BOQ already exists for this project
 	existing, err := u.boqRepo.GetByProjectID(ctx, req.ProjectID)
@@ -50,24 +46,10 @@ func (u *boqUsecase) Create(ctx context.Context, req requests.CreateBOQRequest) 
 		ProjectID:          boq.ProjectID,
 		Status:             boq.Status,
 		SellingGeneralCost: boq.SellingGeneralCost.Float64,
-		Project: responses.ProjectResponse{
-			ID:          project.ProjectID,
-			Name:        project.Name,
-			Description: project.Description,
-			Status:      project.Status,
-			ClientID:    project.ClientID,
-			CreatedAt:   project.CreatedAt,
-			UpdatedAt:   project.UpdatedAt.Time,
-		},
 	}, nil
 }
 func (u *boqUsecase) GetByID(ctx context.Context, id uuid.UUID) (*responses.BOQResponse, error) {
 	boq, err := u.boqRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	project, err := u.projectRepo.GetByID(ctx, boq.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -77,14 +59,9 @@ func (u *boqUsecase) GetByID(ctx context.Context, id uuid.UUID) (*responses.BOQR
 		ProjectID:          boq.ProjectID,
 		Status:             boq.Status,
 		SellingGeneralCost: boq.SellingGeneralCost.Float64,
-		Project: responses.ProjectResponse{
-			ID:          project.ProjectID,
-			Name:        project.Name,
-			Description: project.Description,
-			Status:      project.Status,
-			ClientID:    project.ClientID,
-			CreatedAt:   project.CreatedAt,
-			UpdatedAt:   project.UpdatedAt.Time,
-		},
 	}, nil
+}
+
+func (u *boqUsecase) GetBoqWithProject(ctx context.Context, project_id uuid.UUID) (*responses.BOQResponse, error) {
+	return u.boqRepo.GetBoqWithProject(ctx, project_id)
 }

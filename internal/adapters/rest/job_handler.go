@@ -23,6 +23,7 @@ func NewJobHandler(jobUsecase usecase.JobUseCase) *JobHandler {
 func (h *JobHandler) JobRoutes(app *fiber.App) {
 	job := app.Group("/jobs")
 
+	job.Get("/", h.List)
 	job.Post("/", h.Create)
 	job.Get("/:id", h.GetByID)
 	job.Put("/:id", h.Update)
@@ -83,12 +84,26 @@ func (h *JobHandler) GetByID(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "Job retrieved successfully",
-		"data": responses.JobModelResponse{
+		"data": responses.JobResponse{
 			JobID:       job.JobID,
 			Name:        job.Name,
 			Description: job.Description.String,
 			Unit:        job.Unit,
 		},
+	})
+}
+
+func (h *JobHandler) List(c *fiber.Ctx) error {
+	jobs, err := h.jobUsecase.GetJobList(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve jobs",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Jobs retrieved successfully",
+		"data":    jobs,
 	})
 }
 

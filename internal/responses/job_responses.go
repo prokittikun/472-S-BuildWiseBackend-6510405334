@@ -6,26 +6,15 @@ import (
 	"github.com/google/uuid"
 )
 
-type JobModelResponse struct {
+type JobResponse struct {
 	JobID       uuid.UUID `json:"job_id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Unit        string    `json:"unit"`
 }
 
-type JobResponse struct {
-	JobID       uuid.UUID          `json:"job_id"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Unit        string             `json:"unit"`
-	Materials   []MaterialResponse `json:"materials,omitempty"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-}
-
 type JobListResponse struct {
-	Jobs       []JobResponse      `json:"jobs"`
-	Pagination PaginationResponse `json:"pagination"`
+	Jobs []JobResponse `json:"jobs"`
 }
 
 type PaginationResponse struct {

@@ -38,8 +38,30 @@ func (r *jobRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Job,
 	return &job, nil
 }
 
+// List retrieves all jobs
+func (r *jobRepository) List(ctx context.Context) (*responses.JobListResponse, error) {
+	var jobs []models.Job
+	query := `SELECT * FROM Job`
+	err := r.db.SelectContext(ctx, &jobs, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list jobs: %w", err)
+	}
+
+	var jobList []responses.JobResponse
+	for _, job := range jobs {
+		jobList = append(jobList, responses.JobResponse{
+			JobID:       job.JobID,
+			Name:        job.Name,
+			Description: job.Description.String,
+			Unit:        job.Unit,
+		})
+	}
+
+	return &responses.JobListResponse{Jobs: jobList}, nil
+}
+
 // CreateJob creates a new job without materials
-func (r *jobRepository) Create(ctx context.Context, req requests.CreateJobRequest) (*responses.JobModelResponse, error) {
+func (r *jobRepository) Create(ctx context.Context, req requests.CreateJobRequest) (*responses.JobResponse, error) {
 	job := &models.Job{
 		JobID:       uuid.New(),
 		Name:        req.Name,
@@ -65,7 +87,7 @@ func (r *jobRepository) Create(ctx context.Context, req requests.CreateJobReques
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan job: %w", err)
 		}
-		return &responses.JobModelResponse{
+		return &responses.JobResponse{
 			JobID:       job.JobID,
 			Name:        job.Name,
 			Description: job.Description.String,

@@ -13,9 +13,10 @@ import (
 )
 
 type JobUseCase interface {
-	Create(ctx context.Context, req requests.CreateJobRequest) (*responses.JobModelResponse, error)
+	Create(ctx context.Context, req requests.CreateJobRequest) (*responses.JobResponse, error)
 	Update(ctx context.Context, id uuid.UUID, req requests.UpdateJobRequest) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Job, error)
+	GetJobList(ctx context.Context) (responses.JobListResponse, error)
 	AddMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error
 	DeleteMaterial(ctx context.Context, jobID uuid.UUID, materialID string) error
 	UpdateMaterialQuantity(ctx context.Context, jobID uuid.UUID, req requests.UpdateJobMaterialQuantityRequest) error
@@ -31,7 +32,7 @@ func NewJobUseCase(jobRepo repositories.JobRepository) JobUseCase {
 	}
 }
 
-func (u *jobUseCase) Create(ctx context.Context, req requests.CreateJobRequest) (*responses.JobModelResponse, error) {
+func (u *jobUseCase) Create(ctx context.Context, req requests.CreateJobRequest) (*responses.JobResponse, error) {
 	job, err := u.jobRepo.Create(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create job: %w", err)
@@ -53,6 +54,14 @@ func (u *jobUseCase) Update(ctx context.Context, id uuid.UUID, req requests.Upda
 
 func (u *jobUseCase) GetByID(ctx context.Context, id uuid.UUID) (*models.Job, error) {
 	return u.jobRepo.GetByID(ctx, id)
+}
+
+func (u *jobUseCase) GetJobList(ctx context.Context) (responses.JobListResponse, error) {
+	jobList, err := u.jobRepo.List(ctx)
+	if err != nil {
+		return responses.JobListResponse{}, err
+	}
+	return *jobList, nil
 }
 
 func (u *jobUseCase) AddMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error {

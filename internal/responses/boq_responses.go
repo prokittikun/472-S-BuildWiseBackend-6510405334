@@ -11,7 +11,7 @@ type BOQResponse struct {
 	ProjectID          uuid.UUID        `json:"project_id"`
 	Status             models.BOQStatus `json:"status"`
 	SellingGeneralCost float64          `json:"selling_general_cost"`
-	Project            ProjectResponse  `json:"project,omitempty"`
+	Jobs               []JobResponse    `json:"jobs"`
 }
 
 type BOQListResponse struct {
