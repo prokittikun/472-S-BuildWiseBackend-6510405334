@@ -17,5 +17,5 @@ type UpdateProjectRequest struct {
 	Name        string          `json:"name" validate:"required"`
 	Description string          `json:"description" validate:"required"`
 	Address     json.RawMessage `json:"address" validate:"required"`
-	Status      string          `json:"status" validate:"required,oneof=planning in_progress completed cancelled"`
+	ClientID    uuid.UUID       `json:"client_id" validate:"required"`
 }

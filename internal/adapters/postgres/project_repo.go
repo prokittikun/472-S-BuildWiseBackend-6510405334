@@ -66,7 +66,7 @@ func (r *projectRepository) Update(ctx context.Context, id uuid.UUID, req reques
             name = :name,
             description = :description,
             address = :address,
-            status = :status,
+			client_id = :client_id,
             updated_at = :updated_at
         WHERE project_id = :project_id`
 
@@ -75,7 +75,7 @@ func (r *projectRepository) Update(ctx context.Context, id uuid.UUID, req reques
 		"name":        req.Name,
 		"description": req.Description,
 		"address":     req.Address,
-		"status":      req.Status,
+		"client_id":   req.ClientID,
 		"updated_at":  time.Now(),
 	}
 
