@@ -1,8 +1,6 @@
 package responses
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 )
 
@@ -11,6 +9,21 @@ type JobResponse struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Unit        string    `json:"unit"`
+}
+
+type JobMaterialResponse struct {
+	JobID       uuid.UUID         `json:"job_id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Unit        string            `json:"unit"`
+	Materials   []JobMaterialItem `json:"materials"`
+}
+
+type JobMaterialItem struct {
+	MaterialID string  `json:"material_id" db:"material_id"`
+	Name       string  `json:"name" db:"name"`
+	Unit       string  `json:"unit" db:"unit"`
+	Quantity   float64 `json:"quantity" db:"quantity"`
 }
 
 type JobListResponse struct {
@@ -22,16 +35,6 @@ type PaginationResponse struct {
 	PageSize     int `json:"page_size"`
 	TotalPages   int `json:"total_pages"`
 	TotalRecords int `json:"total_records"`
-}
-
-// JobMaterialResponse represents a response after adding/updating materials
-type JobMaterialResponse struct {
-	JobID        uuid.UUID `json:"job_id"`
-	MaterialID   string    `json:"material_id"`
-	MaterialName string    `json:"material_name"`
-	Unit         string    `json:"unit"`
-	Quantity     float64   `json:"quantity"`
-	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // ApiResponse represents a standard API response structure

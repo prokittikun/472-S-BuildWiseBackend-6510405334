@@ -2,7 +2,6 @@ package rest
 
 import (
 	"boonkosang/internal/requests"
-	"boonkosang/internal/responses"
 	"boonkosang/internal/usecase"
 	"fmt"
 
@@ -78,18 +77,13 @@ func (h *JobHandler) GetByID(c *fiber.Ctx) error {
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to retrieve job",
+			"error": err.Error(),
 		})
 	}
 
 	return c.JSON(fiber.Map{
 		"message": "Job retrieved successfully",
-		"data": responses.JobResponse{
-			JobID:       job.JobID,
-			Name:        job.Name,
-			Description: job.Description.String,
-			Unit:        job.Unit,
-		},
+		"data":    job,
 	})
 }
 

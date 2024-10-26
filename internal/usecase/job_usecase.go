@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"boonkosang/internal/domain/models"
 	"boonkosang/internal/repositories"
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
@@ -15,7 +14,7 @@ import (
 type JobUseCase interface {
 	Create(ctx context.Context, req requests.CreateJobRequest) (*responses.JobResponse, error)
 	Update(ctx context.Context, id uuid.UUID, req requests.UpdateJobRequest) error
-	GetByID(ctx context.Context, id uuid.UUID) (*models.Job, error)
+	GetByID(ctx context.Context, id uuid.UUID) (responses.JobMaterialResponse, error)
 	GetJobList(ctx context.Context) (responses.JobListResponse, error)
 	AddMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error
 	DeleteMaterial(ctx context.Context, jobID uuid.UUID, materialID string) error
@@ -52,8 +51,8 @@ func (u *jobUseCase) Update(ctx context.Context, id uuid.UUID, req requests.Upda
 	return u.jobRepo.Update(ctx, id, req)
 }
 
-func (u *jobUseCase) GetByID(ctx context.Context, id uuid.UUID) (*models.Job, error) {
-	return u.jobRepo.GetByID(ctx, id)
+func (u *jobUseCase) GetByID(ctx context.Context, id uuid.UUID) (responses.JobMaterialResponse, error) {
+	return u.jobRepo.GetJobMaterialByID(ctx, id)
 }
 
 func (u *jobUseCase) GetJobList(ctx context.Context) (responses.JobListResponse, error) {

@@ -23,8 +23,6 @@ type jobRepository struct {
 func NewJobRepository(db *sqlx.DB) repositories.JobRepository {
 	return &jobRepository{db: db}
 }
-
-// GetByID retrieves a job by its ID
 func (r *jobRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Job, error) {
 	var job models.Job
 	query := `SELECT * FROM Job WHERE job_id = $1`
@@ -36,6 +34,81 @@ func (r *jobRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Job,
 		return nil, fmt.Errorf("failed to get job by ID: %w", err)
 	}
 	return &job, nil
+}
+
+func (r *jobRepository) GetJobMaterialByID(ctx context.Context, id uuid.UUID) (responses.JobMaterialResponse, error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return responses.JobMaterialResponse{}, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+	type JobQuery struct {
+		JobID       uuid.UUID      `db:"job_id"`
+		Name        string         `db:"name"`
+		Description sql.NullString `db:"description"`
+		Unit        string         `db:"unit"`
+	}
+
+	// Get job details
+	var jobQuery JobQuery
+	jobQueryString := `
+        SELECT 
+            j.job_id,
+            j.name,
+            j.description,
+            j.unit
+        FROM Job j
+        WHERE j.job_id = $1`
+
+	err = tx.GetContext(ctx, &jobQuery, jobQueryString, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return responses.JobMaterialResponse{}, errors.New("job not found")
+		}
+		return responses.JobMaterialResponse{}, fmt.Errorf("failed to get job: %w", err)
+	}
+
+	// Get materials for the job
+	materialsQuery := `
+        SELECT 
+            m.material_id,
+            m.name,
+            m.unit,
+            jm.quantity
+        FROM Material m
+        JOIN Job_material jm ON m.material_id = jm.material_id
+        WHERE jm.job_id = $1`
+
+	var materials []responses.JobMaterialItem
+	err = tx.SelectContext(ctx, &materials, materialsQuery, id)
+	if err != nil {
+		return responses.JobMaterialResponse{}, fmt.Errorf("failed to get job materials: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return responses.JobMaterialResponse{}, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	var materialsForResponse []responses.JobMaterialItem
+	for _, material := range materials {
+		materialsForResponse = append(materialsForResponse, responses.JobMaterialItem{
+			MaterialID: material.MaterialID,
+			Name:       material.Name,
+			Unit:       material.Unit,
+			Quantity:   material.Quantity,
+		})
+	}
+
+	job := responses.JobMaterialResponse{
+		JobID:       jobQuery.JobID,
+		Name:        jobQuery.Name,
+		Description: jobQuery.Description.String,
+		Unit:        jobQuery.Unit,
+		Materials:   materialsForResponse,
+	}
+
+	return job, nil
 }
 
 // List retrieves all jobs

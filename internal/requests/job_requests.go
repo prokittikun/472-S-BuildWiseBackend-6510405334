@@ -34,8 +34,7 @@ type UpdateJobMaterialQuantityRequest struct {
 	Quantity   float64   `json:"quantity" validate:"required,gt=0"`
 }
 type BOQJobRequest struct {
-	JobID        uuid.UUID `json:"job_id" validate:"required"`
-	Quantity     int       `json:"quantity" validate:"required,gt=0"`
-	LaborCost    float64   `json:"labor_cost" validate:"required,gte=0"`
-	SellingPrice float64   `json:"selling_price" validate:"required,gte=0"`
+	JobID     uuid.UUID `json:"job_id" validate:"required"`
+	Quantity  int       `json:"quantity" validate:"required,gt=0"`
+	LaborCost float64   `json:"labor_cost" validate:"required,gte=0"`
 }
