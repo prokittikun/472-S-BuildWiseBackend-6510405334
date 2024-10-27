@@ -14,5 +14,6 @@ type BOQRepository interface {
 	Approve(ctx context.Context, boqID uuid.UUID) error
 	GetBoqWithProject(ctx context.Context, projectID uuid.UUID) (*responses.BOQResponse, error)
 	AddBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error
+	UpdateBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error
 	DeleteBOQJob(ctx context.Context, boqID uuid.UUID, jobID uuid.UUID) error
 }

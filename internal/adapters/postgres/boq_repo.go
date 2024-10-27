@@ -265,6 +265,49 @@ func (r *boqRepository) AddBOQJob(ctx context.Context, boqID uuid.UUID, req requ
 	return nil
 }
 
+func (r *boqRepository) UpdateBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error {
+	jobID := req.JobID
+	// Start transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Check BOQ status
+	var status string
+	checkStatusQuery := `SELECT status FROM boq WHERE boq_id = $1`
+	err = tx.GetContext(ctx, &status, checkStatusQuery, boqID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.New("boq not found")
+		}
+		return fmt.Errorf("failed to get BOQ status: %w", err)
+	}
+
+	if status != "draft" {
+		return errors.New("can only update jobs in BOQ in draft status")
+	}
+
+	// Update BOQ job
+	updateBOQJobQuery := `
+		UPDATE boq_job
+		SET quantity = $1, labor_cost = $2
+		WHERE boq_id = $3 AND job_id = $4`
+
+	_, err = tx.ExecContext(ctx, updateBOQJobQuery, req.Quantity, req.LaborCost, boqID, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to update job in BOQ: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 func (r *boqRepository) DeleteBOQJob(ctx context.Context, boqID uuid.UUID, jobID uuid.UUID) error {
 	// Start transaction
 	tx, err := r.db.BeginTxx(ctx, nil)

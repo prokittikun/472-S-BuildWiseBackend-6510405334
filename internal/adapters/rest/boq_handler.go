@@ -24,6 +24,7 @@ func (h *BOQHandler) BOQRoutes(app *fiber.App) {
 	boq.Post("/:id/approve", h.Approve)
 	boq.Get("/project/:project_id", h.GetBoqWithProject)
 	boq.Post("/:id/jobs", h.AddBOQJob)
+	boq.Put("/:id/jobs", h.UpdateBOQJob)
 	boq.Delete("/:id/jobs/:jobId", h.DeleteBOQJob)
 }
 
@@ -102,6 +103,34 @@ func (h *BOQHandler) AddBOQJob(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "BOQ job added successfully",
+	})
+}
+
+func (h *BOQHandler) UpdateBOQJob(c *fiber.Ctx) error {
+	boqID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid BOQ ID",
+		})
+	}
+
+	var req requests.BOQJobRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	err = h.boqUsecase.UpdateBOQJob(c.Context(), boqID, req)
+	if err != nil {
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "BOQ job updated successfully",
 	})
 }
 

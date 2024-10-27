@@ -13,6 +13,7 @@ type BOQUsecase interface {
 	Approve(ctx context.Context, boqID uuid.UUID) error
 	GetBoqWithProject(ctx context.Context, project_id uuid.UUID) (*responses.BOQResponse, error)
 	AddBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error
+	UpdateBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error
 	DeleteBOQJob(ctx context.Context, boqID uuid.UUID, jobID uuid.UUID) error
 }
 
@@ -37,6 +38,10 @@ func (u *boqUsecase) GetBoqWithProject(ctx context.Context, project_id uuid.UUID
 
 func (u *boqUsecase) AddBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error {
 	return u.boqRepo.AddBOQJob(ctx, boqID, req)
+}
+
+func (u *boqUsecase) UpdateBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error {
+	return u.boqRepo.UpdateBOQJob(ctx, boqID, req)
 }
 
 func (u *boqUsecase) DeleteBOQJob(ctx context.Context, boqID uuid.UUID, jobID uuid.UUID) error {
