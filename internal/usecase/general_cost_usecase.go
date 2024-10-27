@@ -17,6 +17,8 @@ type GeneralCostUseCase interface {
 	GetByBOQID(ctx context.Context, boqID uuid.UUID) (*responses.GeneralCostListResponse, error)
 	GetByID(ctx context.Context, gID uuid.UUID) (*responses.GeneralCostResponse, error)
 	Update(ctx context.Context, gID uuid.UUID, req requests.UpdateGeneralCostRequest) error
+
+	GetType(ctx context.Context) ([]models.Type, error)
 }
 
 type generalCostUseCase struct {
@@ -94,4 +96,8 @@ func (u *generalCostUseCase) Update(ctx context.Context, gID uuid.UUID, req requ
 	}
 
 	return u.generalCostRepo.Update(ctx, gID, req)
+}
+
+func (u *generalCostUseCase) GetType(ctx context.Context) ([]models.Type, error) {
+	return u.generalCostRepo.GetType(ctx)
 }

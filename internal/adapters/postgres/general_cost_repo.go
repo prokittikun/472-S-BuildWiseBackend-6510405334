@@ -197,3 +197,15 @@ func (r *generalCostRepository) Update(ctx context.Context, gID uuid.UUID, req r
 
 	return nil
 }
+
+func (r *generalCostRepository) GetType(ctx context.Context) ([]models.Type, error) {
+	query := `SELECT * FROM Type`
+
+	var types []models.Type
+	err := r.db.SelectContext(ctx, &types, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get types: %w", err)
+	}
+
+	return types, nil
+}

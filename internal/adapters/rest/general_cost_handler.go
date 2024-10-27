@@ -23,6 +23,7 @@ func (h *GeneralCostHandler) GeneralCostRoutes(app *fiber.App) {
 
 	generalCost.Post("/", h.Create)
 	generalCost.Get("/boq/:boqId", h.GetByBOQID)
+	generalCost.Get("/types", h.GetTypes)
 	generalCost.Get("/:id", h.GetByID)
 	generalCost.Put("/:id", h.Update)
 }
@@ -161,5 +162,19 @@ func (h *GeneralCostHandler) Update(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "General cost updated successfully",
+	})
+}
+
+func (h *GeneralCostHandler) GetTypes(c *fiber.Ctx) error {
+	types, err := h.generalCostUseCase.GetType(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get general cost types",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "General cost types retrieved successfully",
+		"data":    types,
 	})
 }
