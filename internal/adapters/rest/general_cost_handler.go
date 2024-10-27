@@ -55,7 +55,7 @@ func (h *GeneralCostHandler) Create(c *fiber.Ctx) error {
 			})
 		default:
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to create general cost",
+				"error": err.Error(),
 			})
 		}
 	}

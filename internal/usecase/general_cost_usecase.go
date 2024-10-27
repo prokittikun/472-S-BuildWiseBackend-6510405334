@@ -24,7 +24,7 @@ type generalCostUseCase struct {
 	boqRepo         repositories.BOQRepository
 }
 
-func NewGeneralCostUseCase(generalCostRepo repositories.GeneralCostRepository, boqRepo repositories.BOQRepository) GeneralCostUseCase {
+func NewGeneralCostUsecase(generalCostRepo repositories.GeneralCostRepository, boqRepo repositories.BOQRepository) GeneralCostUseCase {
 	return &generalCostUseCase{
 		generalCostRepo: generalCostRepo,
 		boqRepo:         boqRepo,
