@@ -22,84 +22,107 @@ func NewGeneralCostRepository(db *sqlx.DB) repositories.GeneralCostRepository {
 	return &generalCostRepository{db: db}
 }
 
-// Create new general cost
-func (r *generalCostRepository) Create(ctx context.Context, generalCost *models.GeneralCost) (*responses.GeneralCostResponse, error) {
+func (r *generalCostRepository) GetByProjectID(ctx context.Context, projectID uuid.UUID) (*responses.GeneralCostListResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Check if exists
-	var exists bool
-	checkQuery := `
-       SELECT EXISTS(
-           SELECT 1 FROM general_cost 
-           WHERE boq_id = $1 AND type_name = $2
-       )`
-
-	err = tx.GetContext(ctx, &exists, checkQuery, generalCost.BOQID, generalCost.TypeName)
+	// Get BOQ ID for the project
+	var boqID uuid.UUID
+	boqQuery := `SELECT boq_id FROM boq WHERE project_id = $1`
+	err = tx.GetContext(ctx, &boqID, boqQuery, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check existing general cost: %w", err)
+		if err == sql.ErrNoRows {
+			return nil, errors.New("BOQ not found for this project")
+		}
+		return nil, fmt.Errorf("failed to get BOQ: %w", err)
 	}
 
-	if exists {
-		return nil, errors.New("general cost already exists for this type")
-	}
-
-	// Insert new general cost
-	query := `
-       INSERT INTO general_cost (
-           g_id, boq_id, type_name, actual_cost, estimated_cost
-       ) VALUES (
-           $1, $2, $3, $4, $5
-       ) RETURNING *`
-
-	var result models.GeneralCost
-	err = tx.GetContext(ctx, &result, query,
-		generalCost.GID,
-		generalCost.BOQID,
-		generalCost.TypeName,
-		generalCost.ActualCost,
-		generalCost.EstimatedCost,
-	)
+	// Get all available types
+	var types []string
+	typeQuery := `SELECT type_name FROM type`
+	err = tx.SelectContext(ctx, &types, typeQuery)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create general cost: %w", err)
+		return nil, fmt.Errorf("failed to get types: %w", err)
 	}
 
+	// Get existing general costs for this BOQ
+	var existingCosts []models.GeneralCost
+	existingQuery := `
+        SELECT 
+            g_id,
+            boq_id,
+            type_name,
+            actual_cost,
+            estimated_cost
+        FROM general_cost
+        WHERE boq_id = $1`
+
+	err = tx.SelectContext(ctx, &existingCosts, existingQuery, boqID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing general costs: %w", err)
+	}
+
+	// Create a map of existing types for easy lookup
+	existingTypes := make(map[string]bool)
+	for _, cost := range existingCosts {
+		existingTypes[cost.TypeName] = true
+	}
+
+	// Create general costs for missing types
+	for _, typeName := range types {
+		if !existingTypes[typeName] {
+			// Create new general cost for this type
+			newGID := uuid.New()
+			insertQuery := `
+                INSERT INTO general_cost (
+                    g_id, boq_id, type_name, actual_cost, estimated_cost
+                ) VALUES (
+                    $1, $2, $3, $4, $5
+                )`
+
+			_, err = tx.ExecContext(ctx, insertQuery,
+				newGID,
+				boqID,
+				typeName,
+				0, // Default actual_cost
+				0, // Default estimated_cost
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create general cost for type %s: %w", typeName, err)
+			}
+		}
+	}
+
+	// Commit the transaction if all operations are successful
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return &responses.GeneralCostResponse{
-		GID:           result.GID,
-		BOQID:         result.BOQID,
-		TypeName:      result.TypeName,
-		ActualCost:    result.ActualCost.Float64,
-		EstimatedCost: result.EstimatedCost.Float64,
-	}, nil
-}
+	// Get all general costs after creation of missing ones
+	var allGeneralCosts []models.GeneralCost
+	finalQuery := `
+        SELECT 
+            gc.g_id,
+            gc.boq_id,
+            gc.type_name,
+            gc.actual_cost,
+            gc.estimated_cost
+        FROM general_cost gc
+        JOIN boq b ON gc.boq_id = b.boq_id
+        WHERE b.project_id = $1
+        ORDER BY gc.type_name`
 
-// Get general cost by BOQ ID
-func (r *generalCostRepository) GetByBOQID(ctx context.Context, boqID uuid.UUID) (*responses.GeneralCostListResponse, error) {
-	query := `
-       SELECT 
-           g_id,
-           boq_id,
-           type_name,
-           actual_cost,
-           estimated_cost
-       FROM general_cost
-       WHERE boq_id = $1`
-
-	var generalCosts []models.GeneralCost
-	err := r.db.SelectContext(ctx, &generalCosts, query, boqID)
+	err = r.db.SelectContext(ctx, &allGeneralCosts, finalQuery, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get general costs: %w", err)
+		return nil, fmt.Errorf("failed to get final general costs: %w", err)
 	}
 
+	// Convert to response format
 	var response []responses.GeneralCostResponse
-	for _, gc := range generalCosts {
+	for _, gc := range allGeneralCosts {
 		response = append(response, responses.GeneralCostResponse{
 			GID:           gc.GID,
 			BOQID:         gc.BOQID,

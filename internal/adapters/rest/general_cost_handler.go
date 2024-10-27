@@ -21,61 +21,21 @@ func NewGeneralCostHandler(generalCostUseCase usecase.GeneralCostUseCase) *Gener
 func (h *GeneralCostHandler) GeneralCostRoutes(app *fiber.App) {
 	generalCost := app.Group("/general-costs")
 
-	generalCost.Post("/", h.Create)
-	generalCost.Get("/boq/:boqId", h.GetByBOQID)
+	generalCost.Get("/project/:projectId", h.GetByProjectID)
 	generalCost.Get("/types", h.GetTypes)
 	generalCost.Get("/:id", h.GetByID)
 	generalCost.Put("/:id", h.Update)
 }
 
-func (h *GeneralCostHandler) Create(c *fiber.Ctx) error {
-	var req requests.CreateGeneralCostRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
-	// Validate required fields
-	if req.BOQID == uuid.Nil || req.TypeName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing required fields",
-		})
-	}
-
-	generalCost, err := h.generalCostUseCase.Create(c.Context(), req)
-	if err != nil {
-		switch err.Error() {
-		case "can only add general cost to BOQ in draft status":
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "BOQ must be in draft status",
-			})
-		case "general cost already exists for this type":
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"error": "General cost already exists for this type",
-			})
-		default:
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-	}
-
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "General cost created successfully",
-		"data":    generalCost,
-	})
-}
-
-func (h *GeneralCostHandler) GetByBOQID(c *fiber.Ctx) error {
-	boqID, err := uuid.Parse(c.Params("boqId"))
+func (h *GeneralCostHandler) GetByProjectID(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("projectId"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid BOQ ID",
+			"error": "Invalid project ID",
 		})
 	}
 
-	generalCosts, err := h.generalCostUseCase.GetByBOQID(c.Context(), boqID)
+	generalCosts, err := h.generalCostUseCase.GetByProjectID(c.Context(), projectID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to get general costs",
@@ -155,7 +115,7 @@ func (h *GeneralCostHandler) Update(c *fiber.Ctx) error {
 			})
 		default:
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to update general cost",
+				"error": err.Error(),
 			})
 		}
 	}

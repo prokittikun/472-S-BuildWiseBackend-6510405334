@@ -6,15 +6,13 @@ import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/google/uuid"
 )
 
 type GeneralCostUseCase interface {
-	Create(ctx context.Context, req requests.CreateGeneralCostRequest) (*responses.GeneralCostResponse, error)
-	GetByBOQID(ctx context.Context, boqID uuid.UUID) (*responses.GeneralCostListResponse, error)
+	GetByProjectID(ctx context.Context, projectID uuid.UUID) (*responses.GeneralCostListResponse, error)
 	GetByID(ctx context.Context, gID uuid.UUID) (*responses.GeneralCostResponse, error)
 	Update(ctx context.Context, gID uuid.UUID, req requests.UpdateGeneralCostRequest) error
 
@@ -33,30 +31,8 @@ func NewGeneralCostUsecase(generalCostRepo repositories.GeneralCostRepository, b
 	}
 }
 
-func (u *generalCostUseCase) Create(ctx context.Context, req requests.CreateGeneralCostRequest) (*responses.GeneralCostResponse, error) {
-	// Check BOQ status
-	boq, err := u.boqRepo.GetByID(ctx, req.BOQID)
-	if err != nil {
-		return nil, err
-	}
-	if boq.Status != "draft" {
-		return nil, errors.New("can only add general cost to BOQ in draft status")
-	}
-
-	// Create general cost model
-	generalCost := &models.GeneralCost{
-		GID:           uuid.New(),
-		BOQID:         req.BOQID,
-		TypeName:      req.TypeName,
-		ActualCost:    sql.NullFloat64{Float64: 0, Valid: true},
-		EstimatedCost: sql.NullFloat64{Float64: 0, Valid: true},
-	}
-
-	return u.generalCostRepo.Create(ctx, generalCost)
-}
-
-func (u *generalCostUseCase) GetByBOQID(ctx context.Context, boqID uuid.UUID) (*responses.GeneralCostListResponse, error) {
-	return u.generalCostRepo.GetByBOQID(ctx, boqID)
+func (u *generalCostUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUID) (*responses.GeneralCostListResponse, error) {
+	return u.generalCostRepo.GetByProjectID(ctx, projectID)
 }
 
 func (u *generalCostUseCase) GetByID(ctx context.Context, gID uuid.UUID) (*responses.GeneralCostResponse, error) {
