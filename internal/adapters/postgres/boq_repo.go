@@ -24,6 +24,17 @@ func NewBOQRepository(db *sqlx.DB) repositories.BOQRepository {
 	}
 }
 
+func (r *boqRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.BOQ, error) {
+	var boq models.BOQ
+	query := `SELECT * FROM boq WHERE boq_id = $1`
+	err := r.db.GetContext(ctx, &boq, query, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BOQ: %w", err)
+	}
+
+	return &boq, nil
+}
+
 func (r *boqRepository) Approve(ctx context.Context, boqID uuid.UUID) error {
 	// Start transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -70,50 +81,56 @@ func (r *boqRepository) GetBoqWithProject(ctx context.Context, projectID uuid.UU
 	}
 	defer tx.Rollback()
 
-	var data struct {
-		BoqID              uuid.UUID        `db:"boq_id"`
-		ProjectID          uuid.UUID        `db:"project_id"`
-		BOQStatus          models.BOQStatus `db:"boq_status"`
-		SellingGeneralCost sql.NullFloat64  `db:"selling_general_cost"`
-	}
+	var data models.BOQ
 
 	boqQuery := `
-        SELECT 
-            b.boq_id,
-            b.project_id,
-            b.status as boq_status,
-            b.selling_general_cost
-        FROM boq b
-        JOIN project p ON p.project_id = b.project_id
-        WHERE b.project_id = $1`
+        SELECT  boq_id, project_id, status, selling_general_cost
+		FROM Boq
+		WHERE project_id = $1`
 
 	err = tx.GetContext(ctx, &data, boqQuery, projectID)
+	fmt.Print(data)
+	fmt.Print(err)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			fmt.Print("create new boq")
 			// Create new BOQ if it doesn't exist
 			createBOQQuery := `
-                INSERT INTO boq (project_id, status, selling_general_cost) 
-                VALUES ($1, 'draft', NULL) 
-                RETURNING boq_id, project_id, status as boq_status, selling_general_cost`
+                INSERT INTO Boq (project_id, status, selling_general_cost) 
+                VALUES (:project_id, 'draft', NULL) 
+                RETURNING boq_id, project_id, status, selling_general_cost`
 
-			err = tx.GetContext(ctx, &data, createBOQQuery, projectID)
+			row, err := r.db.NamedQueryContext(ctx, createBOQQuery, map[string]interface{}{
+				"project_id": projectID,
+			})
 			if err != nil {
-				return nil, fmt.Errorf("failed to create BOQ: %w", err)
+				return nil, fmt.Errorf("failed to create new BOQ: %w", err)
 			}
+
+			if row.Next() {
+				err = row.StructScan(&data)
+				if err != nil {
+					return nil, fmt.Errorf("failed to scan BOQ: %w", err)
+				}
+			}
+
+			if err := row.Close(); err != nil {
+				return nil, fmt.Errorf("failed to close row: %w", err)
+			}
+
 		} else {
 			return nil, fmt.Errorf("failed to check BOQ existence: %w", err)
 		}
 	}
+	fmt.Print(data)
 
 	// Convert to response struct
 	response := &responses.BOQResponse{
-		ID:                 data.BoqID,
+		ID:                 data.BOQID, // Assuming the correct field name is BOQID
 		ProjectID:          data.ProjectID,
-		Status:             data.BOQStatus,
+		Status:             data.Status, // Assuming the correct field name is Status
 		SellingGeneralCost: data.SellingGeneralCost.Float64,
 	}
-
-	fmt.Print(response)
 
 	jobsQuery := `
    SELECT DISTINCT
@@ -124,7 +141,7 @@ WHERE bj.boq_id = $1
 `
 
 	var jobs []models.Job
-	err = tx.SelectContext(ctx, &jobs, jobsQuery, data.BoqID)
+	err = tx.SelectContext(ctx, &jobs, jobsQuery, data.BOQID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}

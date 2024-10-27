@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"boonkosang/internal/domain/models"
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
@@ -9,7 +10,7 @@ import (
 )
 
 type BOQRepository interface {
-	GetByID(ctx context.Context, id uuid.UUID) (*responses.BOQResponse, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*models.BOQ, error)
 	Approve(ctx context.Context, boqID uuid.UUID) error
 	GetBoqWithProject(ctx context.Context, projectID uuid.UUID) (*responses.BOQResponse, error)
 	AddBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error
