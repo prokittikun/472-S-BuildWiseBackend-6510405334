@@ -10,6 +10,7 @@ import (
 )
 
 type BOQUsecase interface {
+	Approve(ctx context.Context, boqID uuid.UUID) error
 	GetBoqWithProject(ctx context.Context, project_id uuid.UUID) (*responses.BOQResponse, error)
 	AddBOQJob(ctx context.Context, boqID uuid.UUID, req requests.BOQJobRequest) error
 	DeleteBOQJob(ctx context.Context, boqID uuid.UUID, jobID uuid.UUID) error
@@ -25,6 +26,10 @@ func NewBOQUsecase(boqRepo repositories.BOQRepository, projectRepo repositories.
 		boqRepo:     boqRepo,
 		projectRepo: projectRepo,
 	}
+}
+
+func (u *boqUsecase) Approve(ctx context.Context, boqID uuid.UUID) error {
+	return u.boqRepo.Approve(ctx, boqID)
 }
 func (u *boqUsecase) GetBoqWithProject(ctx context.Context, project_id uuid.UUID) (*responses.BOQResponse, error) {
 	return u.boqRepo.GetBoqWithProject(ctx, project_id)

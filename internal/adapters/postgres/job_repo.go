@@ -10,7 +10,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -203,6 +202,85 @@ func (r *jobRepository) Update(ctx context.Context, id uuid.UUID, req requests.U
 	return nil
 }
 
+func (r *jobRepository) Delete(ctx context.Context, jobID uuid.UUID) (*responses.JobUsage, error) {
+	// 5. Check if job is used in any BOQs
+	query := `
+        SELECT DISTINCT 
+            p.project_id,
+            p.name as project_name,
+            b.boq_id,
+            b.status as boq_status
+        FROM boq_job bj 
+        JOIN boq b ON b.boq_id = bj.boq_id 
+        JOIN project p ON p.project_id = b.project_id 
+        WHERE bj.job_id = $1`
+
+	var projects []responses.ProjectUsage
+	err := r.db.SelectContext(ctx, &projects, query, jobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check job usage: %w", err)
+	}
+
+	// If job is used in any projects, return usage information
+	if len(projects) > 0 {
+		return &responses.JobUsage{
+			IsUsed:   true,
+			Projects: projects,
+		}, nil
+	}
+
+	// 7. If job is not used, proceed with deletion
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete job materials first due to foreign key constraint
+	deleteMaterialsQuery := `DELETE FROM Job_material WHERE job_id = $1`
+	_, err = tx.ExecContext(ctx, deleteMaterialsQuery, jobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete job materials: %w", err)
+	}
+	// Delete material price logs
+	deletePriceLogsQuery := `
+		DELETE FROM Material_price_log
+		WHERE job_id = $1
+		AND boq_id IN (
+			SELECT b.boq_id
+			FROM boq b
+			JOIN boq_job bj ON b.boq_id = bj.boq_id
+			WHERE bj.job_id = $1
+			AND b.status = 'draft'
+		)`
+	_, err = tx.ExecContext(ctx, deletePriceLogsQuery, jobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete material price logs: %w", err)
+	}
+
+	// Delete the job
+	deleteJobQuery := `DELETE FROM Job WHERE job_id = $1`
+	result, err := tx.ExecContext(ctx, deleteJobQuery, jobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete job: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if affected == 0 {
+		return nil, fmt.Errorf("job not found")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return &responses.JobUsage{IsUsed: false}, nil
+}
+
 func (r *jobRepository) AddJobMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -285,34 +363,6 @@ func (r *jobRepository) DeleteJobMaterial(ctx context.Context, jobID uuid.UUID, 
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
-
-	checkUsageQuery := `
-		SELECT DISTINCT p.name as project_name, b.boq_id, b.status
-		FROM job_material jm 
-		JOIN boq_job bj ON bj.job_id = jm.job_id 
-		JOIN boq b ON b.boq_id = bj.boq_id 
-		JOIN project p ON p.project_id = b.project_id 
-		WHERE jm.material_id = $1`
-
-	type ProjectUsage struct {
-		ProjectName string    `db:"project_name"`
-		BOQID       uuid.UUID `db:"boq_id"`
-		Status      string    `db:"status"`
-	}
-	var usages []ProjectUsage
-
-	err = tx.SelectContext(ctx, &usages, checkUsageQuery, materialID)
-	if err != nil {
-		return fmt.Errorf("failed to check material usage: %w", err)
-	}
-	fmt.Print(usages)
-	if len(usages) > 0 {
-		var projectNames []string
-		for _, usage := range usages {
-			projectNames = append(projectNames, usage.ProjectName)
-		}
-		return fmt.Errorf("material is used in following projects: %s", strings.Join(projectNames, ", "))
-	}
 
 	deleteJobMaterialQuery := `
 		DELETE FROM Job_material 

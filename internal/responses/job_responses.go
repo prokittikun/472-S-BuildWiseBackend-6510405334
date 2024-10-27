@@ -18,7 +18,17 @@ type JobMaterialResponse struct {
 	Unit        string            `json:"unit"`
 	Materials   []JobMaterialItem `json:"materials"`
 }
+type JobUsage struct {
+	IsUsed   bool           `json:"is_used"`
+	Projects []ProjectUsage `json:"projects,omitempty"`
+}
 
+type ProjectUsage struct {
+	ProjectID   uuid.UUID `db:"project_id"`
+	ProjectName string    `db:"project_name"`
+	BOQID       uuid.UUID `db:"boq_id"`
+	BOQStatus   string    `db:"boq_status"`
+}
 type JobMaterialItem struct {
 	MaterialID string  `json:"material_id" db:"material_id"`
 	Name       string  `json:"name" db:"name"`

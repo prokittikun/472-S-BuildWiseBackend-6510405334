@@ -21,9 +21,31 @@ func NewBOQHandler(boqUsecase usecase.BOQUsecase) *BOQHandler {
 func (h *BOQHandler) BOQRoutes(app *fiber.App) {
 	boq := app.Group("/boqs")
 
+	boq.Post("/:id/approve", h.Approve)
 	boq.Get("/project/:project_id", h.GetBoqWithProject)
 	boq.Post("/:id/jobs", h.AddBOQJob)
 	boq.Delete("/:id/jobs/:jobId", h.DeleteBOQJob)
+}
+
+func (h *BOQHandler) Approve(c *fiber.Ctx) error {
+	boqID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid BOQ ID",
+		})
+	}
+
+	err = h.boqUsecase.Approve(c.Context(), boqID)
+	if err != nil {
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "BOQ approved successfully",
+	})
 }
 
 func (h *BOQHandler) GetBoqWithProject(c *fiber.Ctx) error {

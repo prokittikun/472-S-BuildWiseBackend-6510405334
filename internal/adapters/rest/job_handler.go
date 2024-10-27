@@ -31,6 +31,7 @@ func (h *JobHandler) JobRoutes(app *fiber.App) {
 	job.Post("/:id/materials", h.AddMaterial)
 	job.Delete("/:id/materials/:materialId", h.DeleteMaterial)
 	job.Put("/:id/materials/:materialId/quantity", h.UpdateMaterialQuantity)
+
 }
 
 func (h *JobHandler) Create(c *fiber.Ctx) error {

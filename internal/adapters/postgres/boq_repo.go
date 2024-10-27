@@ -24,6 +24,45 @@ func NewBOQRepository(db *sqlx.DB) repositories.BOQRepository {
 	}
 }
 
+func (r *boqRepository) Approve(ctx context.Context, boqID uuid.UUID) error {
+	// Start transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+
+	}
+
+	// Check BOQ status
+	var status string
+	checkStatusQuery := `SELECT status FROM boq WHERE boq_id = $1`
+	err = tx.GetContext(ctx, &status, checkStatusQuery, boqID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.New("boq not found")
+		}
+		return fmt.Errorf("failed to get BOQ status: %w", err)
+	}
+
+	if status != "draft" {
+		return errors.New("can only approve BOQ in draft status")
+
+	}
+
+	// Update BOQ status
+	updateQuery := `UPDATE boq SET status = 'approved' WHERE boq_id = $1`
+	_, err = tx.ExecContext(ctx, updateQuery, boqID)
+	if err != nil {
+		return fmt.Errorf("failed to update BOQ status: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 func (r *boqRepository) GetBoqWithProject(ctx context.Context, projectID uuid.UUID) (*responses.BOQResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
