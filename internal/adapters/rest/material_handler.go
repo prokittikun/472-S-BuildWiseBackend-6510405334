@@ -161,7 +161,7 @@ func (h *MaterialHandler) Delete(c *fiber.Ctx) error {
 			})
 		default:
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to delete material",
+				"error": err.Error(),
 			})
 		}
 	}

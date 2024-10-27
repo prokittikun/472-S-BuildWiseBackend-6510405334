@@ -271,14 +271,36 @@ func (r *boqRepository) DeleteBOQJob(ctx context.Context, boqID uuid.UUID, jobID
 		return errors.New("can only delete jobs from BOQ in draft status")
 	}
 
-	deleteQuery := `
-		DELETE FROM boq_job 
-		WHERE boq_id = $1 
-		AND job_id = $2`
+	// Delete related material price logs first (foreign key constraint)
+	deleteMaterialPriceLogQuery := `
+        DELETE FROM material_price_log 
+        WHERE boq_id = $1 
+        AND job_id = $2`
 
-	_, err = tx.ExecContext(ctx, deleteQuery, boqID, jobID)
+	_, err = tx.ExecContext(ctx, deleteMaterialPriceLogQuery, boqID, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to delete material price logs: %w", err)
+	}
+
+	// Then delete the BOQ job
+	deleteBOQJobQuery := `
+        DELETE FROM boq_job 
+        WHERE boq_id = $1 
+        AND job_id = $2`
+
+	result, err := tx.ExecContext(ctx, deleteBOQJobQuery, boqID, jobID)
 	if err != nil {
 		return fmt.Errorf("failed to delete job from BOQ: %w", err)
+	}
+
+	// Check if the BOQ job was actually deleted
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("job not found in BOQ")
 	}
 
 	// Commit transaction
@@ -287,5 +309,4 @@ func (r *boqRepository) DeleteBOQJob(ctx context.Context, boqID uuid.UUID, jobID
 	}
 
 	return nil
-
 }

@@ -26,6 +26,7 @@ func (h *JobHandler) JobRoutes(app *fiber.App) {
 	job.Post("/", h.Create)
 	job.Get("/:id", h.GetByID)
 	job.Put("/:id", h.Update)
+	job.Delete("/:id", h.Delete)
 
 	// Material management routes
 	job.Post("/:id/materials", h.AddMaterial)
@@ -99,6 +100,29 @@ func (h *JobHandler) List(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Jobs retrieved successfully",
 		"data":    jobs,
+	})
+}
+
+func (h *JobHandler) Delete(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid job ID",
+		})
+	}
+
+	fmt.Print("delete job" + id.String())
+
+	err = h.jobUsecase.Delete(c.Context(), id)
+	if err != nil {
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Job deleted successfully",
 	})
 }
 

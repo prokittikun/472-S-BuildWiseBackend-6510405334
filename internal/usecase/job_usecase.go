@@ -16,6 +16,7 @@ type JobUseCase interface {
 	Update(ctx context.Context, id uuid.UUID, req requests.UpdateJobRequest) error
 	GetByID(ctx context.Context, id uuid.UUID) (responses.JobMaterialResponse, error)
 	GetJobList(ctx context.Context) (responses.JobListResponse, error)
+	Delete(ctx context.Context, jobID uuid.UUID) error
 	AddMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error
 	DeleteMaterial(ctx context.Context, jobID uuid.UUID, materialID string) error
 	UpdateMaterialQuantity(ctx context.Context, jobID uuid.UUID, req requests.UpdateJobMaterialQuantityRequest) error
@@ -61,6 +62,19 @@ func (u *jobUseCase) GetJobList(ctx context.Context) (responses.JobListResponse,
 		return responses.JobListResponse{}, err
 	}
 	return *jobList, nil
+}
+
+func (u *jobUseCase) Delete(ctx context.Context, jobID uuid.UUID) error {
+	existing, err := u.jobRepo.GetByID(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		return errors.New("job not found")
+	}
+
+	return u.jobRepo.Delete(ctx, jobID)
+
 }
 
 func (u *jobUseCase) AddMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error {

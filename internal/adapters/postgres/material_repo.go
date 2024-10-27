@@ -88,13 +88,73 @@ func (r *materialRepository) Update(ctx context.Context, materialID string, req 
 }
 
 func (r *materialRepository) Delete(ctx context.Context, materialID string) error {
-	query := `DELETE FROM Material WHERE material_id = $1`
-
-	result, err := r.db.ExecContext(ctx, query, materialID)
+	// Start transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "foreign key constraint") {
-			return errors.New("material is in use and cannot be deleted")
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Check material usage in projects
+	type ProjectUsage struct {
+		ProjectID   uuid.UUID `db:"project_id"`
+		ProjectName string    `db:"name"`
+		Status      string    `db:"status"`
+	}
+
+	checkUsageQuery := `
+       SELECT DISTINCT 
+           p.project_id,
+           p.name,
+           b.status
+       FROM job_material jm 
+       JOIN boq_job bj ON bj.job_id = jm.job_id 
+       JOIN boq b ON b.boq_id = bj.boq_id 
+       JOIN project p ON p.project_id = b.project_id 
+       WHERE jm.material_id = $1`
+
+	var usages []ProjectUsage
+	err = tx.SelectContext(ctx, &usages, checkUsageQuery, materialID)
+	if err != nil {
+		return fmt.Errorf("failed to check material usage: %w", err)
+	}
+
+	// If material is being used, return error with project names
+	if len(usages) > 0 {
+		var projectNames []string
+		for _, usage := range usages {
+			projectNames = append(projectNames, usage.ProjectName)
 		}
+		return fmt.Errorf("material is used in following projects: %s", strings.Join(projectNames, ", "))
+	}
+
+	// Delete from material_price_log first
+	deletePriceLogQuery := `
+       DELETE FROM material_price_log 
+       WHERE material_id = $1`
+
+	_, err = tx.ExecContext(ctx, deletePriceLogQuery, materialID)
+	if err != nil {
+		return fmt.Errorf("failed to delete material price logs: %w", err)
+	}
+
+	// Delete from job_material
+	deleteJobMaterialQuery := `
+       DELETE FROM job_material 
+       WHERE material_id = $1`
+
+	_, err = tx.ExecContext(ctx, deleteJobMaterialQuery, materialID)
+	if err != nil {
+		return fmt.Errorf("failed to delete job materials: %w", err)
+	}
+
+	// Finally delete the material
+	deleteMaterialQuery := `
+       DELETE FROM Material 
+       WHERE material_id = $1`
+
+	result, err := tx.ExecContext(ctx, deleteMaterialQuery, materialID)
+	if err != nil {
 		return fmt.Errorf("failed to delete material: %w", err)
 	}
 
@@ -105,6 +165,11 @@ func (r *materialRepository) Delete(ctx context.Context, materialID string) erro
 
 	if rows == 0 {
 		return errors.New("material not found")
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
