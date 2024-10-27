@@ -134,13 +134,23 @@ func (r *boqRepository) GetBoqWithProject(ctx context.Context, projectID uuid.UU
 
 	jobsQuery := `
    SELECT DISTINCT
-	j.*
+	j.*, bj.quantity, bj.labor_cost
 FROM job j
 JOIN boq_job bj ON j.job_id = bj.job_id
 WHERE bj.boq_id = $1
 `
 
-	var jobs []models.Job
+	type BoqJobData struct {
+		JobID       uuid.UUID      `db:"job_id"`
+		Name        string         `db:"name"`
+		Description sql.NullString `db:"description"`
+		Unit        string         `db:"unit"`
+		Quantity    float64        `db:"quantity"`
+		LaborCost   float64        `db:"labor_cost"`
+	}
+
+	var jobs []BoqJobData
+
 	err = tx.SelectContext(ctx, &jobs, jobsQuery, data.BOQID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
@@ -153,6 +163,8 @@ WHERE bj.boq_id = $1
 			Name:        job.Name,
 			Description: job.Description.String,
 			Unit:        job.Unit,
+			Quantity:    job.Quantity,
+			LaborCost:   job.LaborCost,
 		})
 	}
 

@@ -9,6 +9,8 @@ type JobResponse struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Unit        string    `json:"unit"`
+	Quantity    float64   `json:"quantity"`
+	LaborCost   float64   `json:"labor_cost"`
 }
 
 type JobMaterialResponse struct {
