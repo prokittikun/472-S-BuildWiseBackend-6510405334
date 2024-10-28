@@ -66,9 +66,9 @@ type QuotationExportData struct {
 }
 
 type JobDetail struct {
-	Name         string  `db:"name"`
-	Unit         string  `db:"unit"`
-	Quantity     float64 `db:"quantity"`
-	SellingPrice float64 `db:"selling_price"`
-	Amount       float64 `db:"amount"`
+	Name         string          `db:"name"`
+	Unit         string          `db:"unit"`
+	Quantity     float64         `db:"quantity"`
+	SellingPrice sql.NullFloat64 `db:"selling_price"` // Changed to handle NULL
+	Amount       sql.NullFloat64 `db:"amount"`        // Changed to handle NULL
 }

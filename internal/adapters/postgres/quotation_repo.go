@@ -237,7 +237,6 @@ func (r *quotationRepository) GetQuotationStatus(ctx context.Context, projectID 
 
 	return status, nil
 }
-
 func (r *quotationRepository) GetExportData(ctx context.Context, projectID uuid.UUID) (*models.QuotationExportData, error) {
 	// Get main quotation data
 	query := `
@@ -267,14 +266,14 @@ func (r *quotationRepository) GetExportData(ctx context.Context, projectID uuid.
 		return nil, fmt.Errorf("failed to get quotation data: %w", err)
 	}
 
-	// Get job details
+	// Get job details with COALESCE for NULL handling
 	jobQuery := `
         SELECT 
             j.name,
             j.unit,
             bj.quantity,
             bj.selling_price,
-            (bj.selling_price * bj.quantity) as amount
+            COALESCE(bj.selling_price * bj.quantity, 0) as amount
         FROM boq b
         JOIN boq_job bj ON bj.boq_id = b.boq_id
         JOIN job j ON j.job_id = bj.job_id
