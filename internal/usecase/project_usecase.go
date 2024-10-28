@@ -17,6 +17,7 @@ type ProjectUsecase interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	GetByID(ctx context.Context, id uuid.UUID) (*responses.ProjectResponse, error)
 	List(ctx context.Context) (*responses.ProjectListResponse, error)
+	Cancel(ctx context.Context, id uuid.UUID) error
 }
 
 type projectUsecase struct {
@@ -140,4 +141,8 @@ func (u *projectUsecase) List(
 	return &responses.ProjectListResponse{
 		Projects: projectResponses,
 	}, nil
+}
+
+func (u *projectUsecase) Cancel(ctx context.Context, id uuid.UUID) error {
+	return u.projectRepo.Cancel(ctx, id)
 }

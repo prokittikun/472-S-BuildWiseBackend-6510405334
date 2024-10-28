@@ -24,8 +24,9 @@ func (h *ProjectHandler) ProjectRoutes(app *fiber.App) {
 	project.Post("/", h.Create)
 	project.Get("/", h.List)
 	project.Get("/:id", h.GetByID)
+	project.Put("/:id/cancel", h.Cancel)
 	project.Put("/:id", h.Update)
-	project.Delete("/:id", h.Delete)
+
 }
 
 func (h *ProjectHandler) Create(c *fiber.Ctx) error {
@@ -85,34 +86,6 @@ func (h *ProjectHandler) Update(c *fiber.Ctx) error {
 	})
 }
 
-func (h *ProjectHandler) Delete(c *fiber.Ctx) error {
-
-	id := c.Params("id")
-	if id == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid project ID",
-		})
-	}
-
-	uuid, err := uuid.Parse(id)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid project ID format",
-		})
-	}
-
-	err = h.projectUsecase.Delete(c.Context(), uuid)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Project deleted successfully",
-	})
-}
-
 func (h *ProjectHandler) GetByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
@@ -158,5 +131,32 @@ func (h *ProjectHandler) List(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Projects retrieved successfully",
 		"data":    project,
+	})
+}
+
+func (h *ProjectHandler) Cancel(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	uuid, err := uuid.Parse(id)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID format",
+		})
+	}
+
+	err = h.projectUsecase.Cancel(c.Context(), uuid)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Project cancelled successfully",
 	})
 }

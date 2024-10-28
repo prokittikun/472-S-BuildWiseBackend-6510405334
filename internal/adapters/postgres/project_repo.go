@@ -176,3 +176,26 @@ func (r *projectRepository) List(ctx context.Context) ([]models.Project, error) 
 
 	return projects, nil
 }
+
+func (r *projectRepository) Cancel(ctx context.Context, id uuid.UUID) error {
+	query := `
+		UPDATE Project SET 
+			status = 'cancelled'
+		WHERE project_id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to cancel project: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("project not found")
+	}
+
+	return nil
+}

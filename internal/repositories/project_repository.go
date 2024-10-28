@@ -15,4 +15,5 @@ type ProjectRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Project, error)
 	GetByIDWithClient(ctx context.Context, id uuid.UUID) (*models.Project, *models.Client, error)
 	List(ctx context.Context) ([]models.Project, error)
+	Cancel(ctx context.Context, id uuid.UUID) error
 }
