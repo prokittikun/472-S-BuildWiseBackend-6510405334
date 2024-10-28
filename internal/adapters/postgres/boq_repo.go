@@ -74,6 +74,17 @@ func (r *boqRepository) Approve(ctx context.Context, boqID uuid.UUID) error {
 	return nil
 }
 
+func (r *boqRepository) GetByProjectID(ctx context.Context, projectID uuid.UUID) (*models.BOQ, error) {
+	var boq models.BOQ
+	query := `SELECT * FROM boq WHERE project_id = $1`
+	err := r.db.GetContext(ctx, &boq, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BOQ: %w", err)
+	}
+
+	return &boq, nil
+}
+
 func (r *boqRepository) GetBoqWithProject(ctx context.Context, projectID uuid.UUID) (*responses.BOQResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -381,4 +392,91 @@ func (r *boqRepository) DeleteBOQJob(ctx context.Context, boqID uuid.UUID, jobID
 	}
 
 	return nil
+}
+
+func (r *boqRepository) GetBOQGeneralCosts(ctx context.Context, boqID uuid.UUID) ([]models.BOQGeneralCost, error) {
+	query := `
+        SELECT b.boq_id, gc.type_name, gc.estimated_cost 
+        FROM boq b 
+        JOIN general_cost gc ON gc.boq_id = b.boq_id 
+        JOIN "type" t ON t.type_name = gc.type_name 
+        WHERE b.boq_id = $1`
+
+	var costs []models.BOQGeneralCost
+	err := r.db.SelectContext(ctx, &costs, query, boqID)
+	if err != nil {
+		return nil, err
+	}
+
+	return costs, nil
+}
+func (r *boqRepository) GetBOQDetails(ctx context.Context, projectID uuid.UUID) ([]models.BOQDetails, error) {
+	query := `
+        WITH MaterialTotals AS (
+            SELECT 
+                job_id, 
+                boq_id, 
+                COALESCE(SUM(COALESCE(estimated_price, 0) * COALESCE(quantity, 0)), 0) as total_material_price
+            FROM material_price_log
+            GROUP BY job_id, boq_id
+        )
+        SELECT 
+            p.name, 
+            p.address, 
+			j.job_id,
+            j.name as job_name, 
+            j.description, 
+            bj.quantity, 
+            j.unit, 
+            COALESCE(bj.labor_cost, 0) as labor_cost,
+            mt.total_material_price as estimated_price,
+            (mt.total_material_price * bj.quantity) as total_estimated_price,
+            (COALESCE(bj.labor_cost, 0) * bj.quantity) as total_labour_cost,
+            ((mt.total_material_price * bj.quantity) + (COALESCE(bj.labor_cost, 0) * bj.quantity)) as total
+        FROM project p 
+        JOIN boq b ON b.project_id = p.project_id 
+        LEFT JOIN client c ON c.client_id = p.project_id
+        JOIN boq_job bj ON bj.boq_id = b.boq_id 
+        JOIN job j ON j.job_id = bj.job_id 
+        LEFT JOIN MaterialTotals mt ON mt.job_id = bj.job_id AND mt.boq_id = bj.boq_id 
+        WHERE p.project_id = $1 
+        GROUP BY 
+            p.name, p.address, j.job_id, j.name, j.description, 
+            bj.quantity, j.unit, bj.labor_cost, mt.total_material_price`
+
+	var details []models.BOQDetails
+	err := r.db.SelectContext(ctx, &details, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get BOQ details: %w", err)
+	}
+
+	return details, nil
+}
+
+func (r *boqRepository) GetBOQMaterialDetails(ctx context.Context, projectID uuid.UUID) ([]models.BOQMaterialDetails, error) {
+	query := `
+        SELECT 
+		    j.job_id,
+            j.name, 
+            m.name as material_name,
+            mpl.quantity, 
+            m.unit, 
+            mpl.estimated_price, 
+            COALESCE(mpl.quantity, 0) * COALESCE(mpl.estimated_price, 0) as total
+        FROM project p 
+        JOIN boq b ON b.project_id = p.project_id 
+        LEFT JOIN client c ON c.client_id = p.project_id 
+        JOIN boq_job bj ON bj.boq_id = b.boq_id 
+        JOIN job j ON j.job_id = bj.job_id 
+        LEFT JOIN material_price_log mpl ON mpl.job_id = bj.job_id AND mpl.boq_id = bj.boq_id 
+        JOIN material m ON m.material_id = mpl.material_id 
+        WHERE p.project_id = $1`
+
+	var details []models.BOQMaterialDetails
+	err := r.db.SelectContext(ctx, &details, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get material details: %w", err)
+	}
+
+	return details, nil
 }

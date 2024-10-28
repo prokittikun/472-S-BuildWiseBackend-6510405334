@@ -21,6 +21,8 @@ func NewBOQHandler(boqUsecase usecase.BOQUsecase) *BOQHandler {
 func (h *BOQHandler) BOQRoutes(app *fiber.App) {
 	boq := app.Group("/boqs")
 
+	boq.Get("/project/:projectId/export", h.ExportBOQ)
+
 	boq.Post("/:id/approve", h.Approve)
 	boq.Get("/project/:project_id", h.GetBoqWithProject)
 	boq.Post("/:id/jobs", h.AddBOQJob)
@@ -160,4 +162,27 @@ func (h *BOQHandler) DeleteBOQJob(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "BOQ job deleted successfully",
 	})
+}
+
+func (h *BOQHandler) ExportBOQ(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("projectId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	// Get BOQ summary data
+	summary, err := h.boqUsecase.GetBOQSummary(c.Context(), projectID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "BOQ summary retrieved successfully",
+		"data":    summary,
+	})
+
 }
