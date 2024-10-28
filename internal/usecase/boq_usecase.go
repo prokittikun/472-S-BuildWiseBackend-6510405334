@@ -6,6 +6,7 @@ import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -119,7 +120,7 @@ func transformToResponse(firstDetail models.BOQDetails, generalCosts []models.BO
 	response := &responses.BOQSummaryResponse{
 		ProjectInfo: responses.ProjectInfo{
 			ProjectName:    firstDetail.ProjectName,
-			ProjectAddress: firstDetail.ProjectAddress.String,
+			ProjectAddress: json.RawMessage(firstDetail.ProjectAddress.String),
 		},
 		GeneralCosts: transformGeneralCosts(generalCosts),
 		Details:      transformBOQDetailsWithMaterials(details, materials),

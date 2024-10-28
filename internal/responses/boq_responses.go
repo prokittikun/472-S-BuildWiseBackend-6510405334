@@ -2,6 +2,7 @@ package responses
 
 import (
 	"boonkosang/internal/domain/models"
+	"encoding/json"
 
 	"github.com/google/uuid"
 )
@@ -27,8 +28,8 @@ type BOQSummaryResponse struct {
 }
 
 type ProjectInfo struct {
-	ProjectName    string `json:"project_name"`
-	ProjectAddress string `json:"project_address"`
+	ProjectName    string          `json:"project_name"`
+	ProjectAddress json.RawMessage `json:"project_address"`
 }
 
 type GeneralCostDTO struct {
