@@ -22,6 +22,7 @@ func (h *QuotationHandler) QuotationRoutes(app *fiber.App) {
 	quotation := app.Group("/quotations")
 
 	// Create or Get Quotation
+	quotation.Get("/projects/:projectId/export", h.ExportQuotation)
 
 	quotation.Post("/projects/:projectId", h.CreateOrGetQuotation)
 	quotation.Put("/projects/:projectId/approve", h.ApproveQuotation)
@@ -107,5 +108,46 @@ func (h *QuotationHandler) ApproveQuotation(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Quotation approved successfully",
+	})
+}
+
+func (h *QuotationHandler) ExportQuotation(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("projectId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID format",
+		})
+	}
+
+	exportData, err := h.quotationUsecase.ExportQuotation(c.Context(), projectID)
+	if err != nil {
+		switch err.Error() {
+		case "BOQ must be approved before exporting quotation":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		case "BOQ not found":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "BOQ not found",
+			})
+		case "quotation not found":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Quotation not found",
+			})
+		case "only approved quotations can be exported":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to export quotation",
+				"details": err.Error(),
+			})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Quotation exported successfully",
+		"data":    exportData,
 	})
 }
