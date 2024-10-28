@@ -88,6 +88,11 @@ func main() {
 	GeneralCostHandler := rest.NewGeneralCostHandler(generalCostUseCase)
 	GeneralCostHandler.GeneralCostRoutes(app)
 
+	quotationRepo := postgres.NewQuotationRepository(db)
+	quotationUseCase := usecase.NewQuotationUsecase(quotationRepo)
+	QuotationHandler := rest.NewQuotationHandler(quotationUseCase)
+	QuotationHandler.QuotationRoutes(app)
+
 	port := getEnv("PORT", "8004")
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
