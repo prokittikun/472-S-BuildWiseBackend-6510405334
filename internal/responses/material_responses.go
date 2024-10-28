@@ -12,7 +12,6 @@ type MaterialListResponse struct {
 
 type MaterialPriceListResponse struct {
 	Materials []MaterialPriceDetail `json:"materials"`
-	Totals    MaterialPriceTotals   `json:"totals"`
 }
 
 type MaterialPriceDetail struct {
@@ -24,9 +23,4 @@ type MaterialPriceDetail struct {
 	AvgActualPrice float64 `json:"avg_actual_price"`
 	ActualPrice    float64 `json:"actual_price"`
 	SupplierName   string  `json:"supplier_name"`
-}
-
-type MaterialPriceTotals struct {
-	TotalEstimatedPrice float64 `json:"total_estimated_price"`
-	TotalActualPrice    float64 `json:"total_actual_price"`
 }

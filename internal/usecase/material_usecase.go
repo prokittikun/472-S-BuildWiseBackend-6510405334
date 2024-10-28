@@ -127,7 +127,6 @@ func (u *materialUsecase) GetMaterialPrices(ctx context.Context, projectID uuid.
 	}
 
 	var response []responses.MaterialPriceDetail
-	var totalEstimated, totalActual float64
 
 	for _, m := range materials {
 		detail := responses.MaterialPriceDetail{
@@ -141,18 +140,11 @@ func (u *materialUsecase) GetMaterialPrices(ctx context.Context, projectID uuid.
 			SupplierName:   m.SupplierName.String,
 		}
 
-		totalEstimated += m.EstimatedPrice.Float64
-		totalActual += m.ActualPrice.Float64
-
 		response = append(response, detail)
 	}
 
 	return &responses.MaterialPriceListResponse{
 		Materials: response,
-		Totals: responses.MaterialPriceTotals{
-			TotalEstimatedPrice: totalEstimated,
-			TotalActualPrice:    totalActual,
-		},
 	}, nil
 }
 
