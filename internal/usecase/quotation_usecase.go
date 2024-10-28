@@ -29,8 +29,6 @@ func NewQuotationUsecase(quotationRepo repositories.QuotationRepository) Quotati
 		quotationRepo: quotationRepo,
 	}
 }
-
-// usecase/quotation_usecase.go
 func (u *quotationUsecase) buildQuotationResponse(
 	quotation *models.Quotation,
 	jobs []models.QuotationJob,
@@ -49,32 +47,27 @@ func (u *quotationUsecase) buildQuotationResponse(
 	var totalMaterialCost float64
 
 	for _, job := range jobs {
-		materialCost := 0.0
-		if job.EstimatedPrice.Valid {
-			materialCost = job.EstimatedPrice.Float64
-		}
-
-		totalCost := job.TotalLaborCost // Labor cost is always present
-		if job.Total.Valid {
-			totalCost = job.Total.Float64
-		}
 
 		jobDetail := responses.QuotationJobDetail{
-			Name:         job.JobName,
-			Unit:         job.Unit,
-			Quantity:     job.Quantity,
-			LaborCost:    job.LaborCost,
-			MaterialCost: materialCost,
-			TotalCost:    totalCost,
+			Name:               job.JobName,
+			Unit:               job.Unit,
+			Quantity:           job.Quantity,
+			LaborCost:          job.LaborCost,
+			SellingPrice:       job.SellingPrice.Float64,
+			TotalMaterialPrice: job.TotalMaterialPrice.Float64,
+			Total:              job.Total.Float64,
+			OverallCost:        job.OverallCost.Float64,
+			TotalSellingPrice:  job.TotalSellingPrice.Float64,
 		}
 
 		if job.SellingPrice.Valid {
 			jobDetail.SellingPrice = job.SellingPrice.Float64
 		}
 
-		totalLaborCost += job.TotalLaborCost
-		if job.TotalEstPrice.Valid {
-			totalMaterialCost += job.TotalEstPrice.Float64
+		// Accumulate totals
+		totalLaborCost += job.LaborCost * job.Quantity
+		if job.TotalMaterialPrice.Valid {
+			totalMaterialCost += job.TotalMaterialPrice.Float64 * job.Quantity
 		}
 
 		response.Jobs = append(response.Jobs, jobDetail)
@@ -91,26 +84,6 @@ func (u *quotationUsecase) buildQuotationResponse(
 			totalGeneralCost += cost.EstimatedCost.Float64
 			response.Costs = append(response.Costs, costDetail)
 		}
-	}
-
-	// Calculate summary
-	subtotal := totalLaborCost + totalMaterialCost + totalGeneralCost
-	var taxPercentage float64
-	if quotation.TaxPercentage.Valid {
-		taxPercentage = quotation.TaxPercentage.Float64
-	} else {
-		taxPercentage = 0.0
-	}
-	tax := subtotal * (taxPercentage / 100)
-	total := subtotal + tax
-
-	response.Summary = responses.QuotationSummary{
-		TotalLaborCost:    roundFloat(totalLaborCost, 2),
-		TotalMaterialCost: roundFloat(totalMaterialCost, 2),
-		TotalGeneralCost:  roundFloat(totalGeneralCost, 2),
-		SubTotal:          roundFloat(subtotal, 2),
-		Tax:               roundFloat(tax, 2),
-		Total:             roundFloat(total, 2),
 	}
 
 	return response

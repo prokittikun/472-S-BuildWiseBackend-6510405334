@@ -25,19 +25,19 @@ type Quotation struct {
 }
 
 type QuotationJob struct {
-	QuotationID    uuid.UUID       `db:"quotation_id"`
-	Status         string          `db:"status"`
-	ValidDate      time.Time       `db:"valid_date"`
-	TaxPercentage  float64         `db:"tax_percentage"`
-	JobName        string          `db:"name"`
-	Unit           string          `db:"unit"`
-	Quantity       float64         `db:"quantity"`
-	LaborCost      float64         `db:"labor_cost"`
-	TotalLaborCost float64         `db:"total_labor_cost"`
-	EstimatedPrice sql.NullFloat64 `db:"estimated_price"`
-	TotalEstPrice  sql.NullFloat64 `db:"total_estimated_price"`
-	Total          sql.NullFloat64 `db:"total"`
-	SellingPrice   sql.NullFloat64 `db:"selling_price"`
+	QuotationID        uuid.UUID       `db:"quotation_id"`
+	Status             string          `db:"status"`
+	ValidDate          time.Time       `db:"valid_date"`
+	TaxPercentage      float64         `db:"tax_percentage"`
+	JobName            string          `db:"name"`
+	Unit               string          `db:"unit"`
+	Quantity           float64         `db:"quantity"`
+	LaborCost          float64         `db:"labor_cost"`
+	TotalMaterialPrice sql.NullFloat64 `db:"total_material_price"`
+	OverallCost        sql.NullFloat64 `db:"overall_cost"`
+	SellingPrice       sql.NullFloat64 `db:"selling_price"`
+	Total              sql.NullFloat64 `db:"total"`
+	TotalSellingPrice  sql.NullFloat64 `db:"total_selling_price"`
 }
 
 type QuotationGeneralCost struct {

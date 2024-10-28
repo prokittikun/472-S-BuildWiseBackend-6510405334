@@ -96,38 +96,46 @@ func (r *quotationRepository) Create(ctx context.Context, projectID uuid.UUID) (
 }
 func (r *quotationRepository) GetQuotationJobs(ctx context.Context, projectID uuid.UUID) ([]models.QuotationJob, error) {
 	query := `
-        SELECT 
-            q.quotation_id, 
-            q.status, 
-            q.valid_date, 
-            q.tax_percentage,
-            j.name, 
-            j.unit, 
-            bj.quantity, 
-            bj.labor_cost,
-            (bj.labor_cost * bj.quantity) as total_labor_cost,
-            COALESCE(SUM(mpl.estimated_price), 0) as estimated_price,
-            COALESCE(SUM(mpl.estimated_price) * bj.quantity, 0) as total_estimated_price,
-            COALESCE((bj.labor_cost * bj.quantity) + (SUM(mpl.estimated_price) * bj.quantity), 
-                     bj.labor_cost * bj.quantity) as total,
-            bj.selling_price
-        FROM project p
-        LEFT JOIN quotation q ON q.project_id = p.project_id
-        JOIN boq b ON b.project_id = p.project_id
-        JOIN boq_job bj ON bj.boq_id = b.boq_id
-        JOIN job j ON j.job_id = bj.job_id
-        LEFT JOIN material_price_log mpl ON mpl.job_id = j.job_id AND mpl.boq_id = b.boq_id
-        WHERE p.project_id = $1
-        GROUP BY 
-            q.quotation_id, 
-            q.status, 
-            q.valid_date, 
-            q.tax_percentage,
-            j.name, 
-            j.unit, 
-            bj.quantity, 
-            bj.labor_cost, 
-            bj.selling_price`
+WITH MaterialTotals AS (
+    SELECT 
+        job_id, 
+        boq_id, 
+        SUM(estimated_price * quantity) as total_material_price 
+    FROM material_price_log 
+    GROUP BY job_id, boq_id
+)
+SELECT 
+    q.quotation_id, 
+    q.status, 
+    q.valid_date, 
+    q.tax_percentage, 
+    j.name, 
+    j.unit, 
+    bj.quantity, 
+    bj.labor_cost, 
+    mt.total_material_price,
+    (mt.total_material_price + bj.labor_cost) as overall_cost,
+    bj.selling_price,
+    (mt.total_material_price + bj.labor_cost) * bj.quantity as total,
+    (bj.selling_price * bj.quantity) as total_selling_price
+FROM project p
+LEFT JOIN quotation q ON q.project_id = p.project_id
+JOIN boq b ON b.project_id = p.project_id
+JOIN boq_job bj ON bj.boq_id = b.boq_id
+JOIN job j ON j.job_id = bj.job_id
+LEFT JOIN MaterialTotals mt ON mt.job_id = j.job_id AND mt.boq_id = b.boq_id
+WHERE p.project_id = $1
+GROUP BY 
+    q.quotation_id, 
+    q.status, 
+    q.valid_date, 
+    q.tax_percentage,
+    j.name, 
+    j.unit, 
+    bj.quantity, 
+    bj.labor_cost, 
+    bj.selling_price, 
+    mt.total_material_price`
 
 	var jobs []models.QuotationJob
 	err := r.db.SelectContext(ctx, &jobs, query, projectID)
