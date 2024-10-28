@@ -2,6 +2,7 @@
 package rest
 
 import (
+	"boonkosang/internal/requests"
 	"boonkosang/internal/usecase"
 
 	"github.com/gofiber/fiber/v2"
@@ -23,6 +24,8 @@ func (h *QuotationHandler) QuotationRoutes(app *fiber.App) {
 
 	// Create or Get Quotation
 	quotation.Get("/projects/:projectId/export", h.ExportQuotation)
+
+	quotation.Put("/projects/:projectId/selling-price", h.UpdateProjectSellingPrice)
 
 	quotation.Post("/projects/:projectId", h.CreateOrGetQuotation)
 	quotation.Put("/projects/:projectId/approve", h.ApproveQuotation)
@@ -149,5 +152,36 @@ func (h *QuotationHandler) ExportQuotation(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Quotation exported successfully",
 		"data":    exportData,
+	})
+}
+
+func (h *QuotationHandler) UpdateProjectSellingPrice(c *fiber.Ctx) error {
+	var req requests.UpdateProjectSellingPriceRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Parse project ID from URL
+	projectID, err := uuid.Parse(c.Params("projectId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+	req.ProjectID = projectID
+
+	err = h.quotationUsecase.UpdateProjectSellingPrice(c.Context(), req)
+	if err != nil {
+
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Project selling prices updated successfully",
 	})
 }

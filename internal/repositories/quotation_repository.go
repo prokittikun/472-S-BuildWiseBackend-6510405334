@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"boonkosang/internal/domain/models"
+	"boonkosang/internal/requests"
 	"context"
 
 	"github.com/google/uuid"
@@ -19,4 +20,6 @@ type QuotationRepository interface {
 	ValidateApproval(ctx context.Context, projectID uuid.UUID) error
 
 	GetExportData(ctx context.Context, projectID uuid.UUID) (*models.QuotationExportData, error)
+
+	UpdateProjectSellingPrice(ctx context.Context, req requests.UpdateProjectSellingPriceRequest) error
 }

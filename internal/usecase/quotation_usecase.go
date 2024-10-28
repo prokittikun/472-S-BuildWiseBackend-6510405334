@@ -3,6 +3,7 @@ package usecase
 import (
 	"boonkosang/internal/domain/models"
 	"boonkosang/internal/repositories"
+	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
 	"database/sql"
@@ -18,6 +19,8 @@ type QuotationUsecase interface {
 	CreateOrGetQuotation(ctx context.Context, projectID uuid.UUID) (*responses.QuotationResponse, error)
 	ApproveQuotation(ctx context.Context, projectID uuid.UUID) error
 	ExportQuotation(ctx context.Context, projectID uuid.UUID) (*models.QuotationExportData, error)
+
+	UpdateProjectSellingPrice(ctx context.Context, req requests.UpdateProjectSellingPriceRequest) error
 }
 
 type quotationUsecase struct {
@@ -204,4 +207,53 @@ func (u *quotationUsecase) ExportQuotation(ctx context.Context, projectID uuid.U
 
 	return exportData, nil
 
+}
+
+func (u *quotationUsecase) UpdateProjectSellingPrice(ctx context.Context, req requests.UpdateProjectSellingPriceRequest) error {
+
+	boqStatus, err := u.quotationRepo.CheckBOQStatus(ctx, req.ProjectID)
+	if err != nil {
+		return err
+	}
+
+	if boqStatus != "approved" {
+		return errors.New("BOQ must be approved before updating selling price")
+	}
+
+	quotationStatus, err := u.quotationRepo.GetQuotationStatus(ctx, req.ProjectID)
+	if err != nil {
+		return err
+	}
+
+	if quotationStatus != "draft" {
+		return errors.New("can only update selling price for quotation in draft status")
+	}
+
+	if err := validateSellingPriceRequest(req); err != nil {
+		return err
+	}
+
+	return u.quotationRepo.UpdateProjectSellingPrice(ctx, req)
+}
+
+func validateSellingPriceRequest(req requests.UpdateProjectSellingPriceRequest) error {
+	if req.TaxPercentage <= 0 {
+		return errors.New("tax percentage must be greater than 0")
+	}
+
+	if req.SellingGeneralCost <= 0 {
+		return errors.New("selling general cost must be greater than 0")
+	}
+
+	if len(req.JobSellingPrices) == 0 {
+		return errors.New("at least one job selling price is required")
+	}
+
+	for _, job := range req.JobSellingPrices {
+		if job.SellingPrice <= 0 {
+			return fmt.Errorf("selling price for job %s must be greater than 0", job.JobID)
+		}
+	}
+
+	return nil
 }
