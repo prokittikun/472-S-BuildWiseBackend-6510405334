@@ -278,7 +278,7 @@ func (r *generalCostRepository) UpdateActualCost(ctx context.Context, gID uuid.U
 		return errors.New("BOQ must be approved to update actual cost")
 	}
 	if projectStatus.QuotationStatus != "approved" {
-		return errors.New("Quotation must be approved to update actual cost")
+		return errors.New("quotation must be approved to update actual cost")
 	}
 
 	// Update actual cost
@@ -337,7 +337,7 @@ func (r *generalCostRepository) ValidateProjectStatus(ctx context.Context, proje
 		return errors.New("BOQ must be approved to update actual cost")
 	}
 	if status.QuotationStatus != "approved" {
-		return errors.New("Quotation must be approved to update actual cost")
+		return errors.New("quotation must be approved to update actual cost")
 	}
 
 	return nil
