@@ -9,7 +9,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -96,11 +95,6 @@ func getValidTime(nullTime sql.NullTime) time.Time {
 		return nullTime.Time
 	}
 	return time.Time{}
-}
-
-func roundFloat(val float64, precision uint) float64 {
-	ratio := math.Pow(10, float64(precision))
-	return math.Round(val*ratio) / ratio
 }
 
 func (u *quotationUsecase) CreateOrGetQuotation(ctx context.Context, projectID uuid.UUID) (*responses.QuotationResponse, error) {

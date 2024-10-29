@@ -94,27 +94,6 @@ func transformGeneralCosts(costs []models.BOQGeneralCost) []responses.GeneralCos
 	return dtos
 }
 
-func transformBOQDetails(details []models.BOQDetails) []responses.BOQDetailDTO {
-	dtos := make([]responses.BOQDetailDTO, len(details))
-	for i, detail := range details {
-		totalEstimatedPrice := detail.EstimatedPrice.Float64 * float64(detail.Quantity)
-		totalLaborCost := detail.LaborCost * float64(detail.Quantity)
-
-		dtos[i] = responses.BOQDetailDTO{
-			JobName:             detail.JobName,
-			Description:         detail.Description.String,
-			Quantity:            detail.Quantity,
-			Unit:                detail.Unit,
-			LaborCost:           detail.LaborCost,
-			EstimatedPrice:      detail.EstimatedPrice.Float64,
-			TotalEstimatedPrice: totalEstimatedPrice,
-			TotalLaborCost:      totalLaborCost,
-			Total:               totalEstimatedPrice + totalLaborCost,
-		}
-	}
-	return dtos
-}
-
 // Update the transform function to handle the grouping
 func transformToResponse(firstDetail models.BOQDetails, generalCosts []models.BOQGeneralCost, details []models.BOQDetails, materials []models.BOQMaterialDetails) *responses.BOQSummaryResponse {
 	response := &responses.BOQSummaryResponse{
