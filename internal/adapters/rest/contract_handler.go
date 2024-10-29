@@ -19,7 +19,7 @@ func NewContractHandler(contractUseCase usecase.ContractUseCase) *ContractHandle
 }
 
 func (h *ContractHandler) ContractRoutes(app *fiber.App) {
-	contract := app.Group("/contract/:projectId")
+	contract := app.Group("/contracts/:projectId")
 
 	contract.Get("/", h.GetContract)
 	contract.Post("/", h.CreateContract)

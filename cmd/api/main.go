@@ -103,6 +103,11 @@ func main() {
 	ContractHandler := rest.NewContractHandler(contractUseCase)
 	ContractHandler.ContractRoutes(app)
 
+	invoiceRepo := postgres.NewInvoiceRepository(db)
+	invoiceUseCase := usecase.NewInvoiceUsecase(invoiceRepo, projectRepo)
+	InvoiceHandler := rest.NewInvoiceHandler(invoiceUseCase)
+	InvoiceHandler.InvoiceRoutes(app)
+
 	port := getEnv("PORT", "8004")
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
