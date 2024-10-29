@@ -51,6 +51,7 @@ func (u *quotationUsecase) buildQuotationResponse(
 	for _, job := range jobs {
 
 		jobDetail := responses.QuotationJobDetail{
+			ID:                 job.JobID,
 			Name:               job.JobName,
 			Unit:               job.Unit,
 			Quantity:           job.Quantity,

@@ -18,6 +18,8 @@ type QuotationResponse struct {
 }
 
 type QuotationJobDetail struct {
+	ID uuid.UUID `json:"id"`
+
 	Name               string  `json:"name"`
 	Unit               string  `json:"unit"`
 	Quantity           float64 `json:"quantity"`

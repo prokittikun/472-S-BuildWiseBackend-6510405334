@@ -29,6 +29,7 @@ type QuotationJob struct {
 	Status             string          `db:"status"`
 	ValidDate          time.Time       `db:"valid_date"`
 	TaxPercentage      float64         `db:"tax_percentage"`
+	JobID              uuid.UUID       `db:"job_id"`
 	JobName            string          `db:"name"`
 	Unit               string          `db:"unit"`
 	Quantity           float64         `db:"quantity"`
