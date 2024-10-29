@@ -450,15 +450,6 @@ func (r *jobRepository) UpdateJobMaterialQuantity(ctx context.Context, jobID uui
 	return nil
 }
 
-// validateQuantity checks if quantity is valid (not null and positive integer)
-func validateQuantity(quantity int) error {
-	if quantity <= 0 {
-		return errors.New("quantity must be a positive integer")
-	}
-	return nil
-}
-
-// UpdateJobMaterialQuantityRequest struct should look like this:
 type UpdateJobMaterialQuantityRequest struct {
 	MaterialID uuid.UUID `json:"material_id" validate:"required"`
 	Quantity   int       `json:"quantity" validate:"required,gt=0"`

@@ -298,14 +298,6 @@ func (r *projectRepository) ValidateProjectData(ctx context.Context, projectID u
 		return fmt.Errorf("failed to validate project data: %w", err)
 	}
 
-	if result.TotalMaterials == 0 {
-		return errors.New("no materials found for this project")
-	}
-
-	if result.TotalMaterials != result.FilledMaterials {
-		return errors.New("some materials are missing price information")
-	}
-
 	return nil
 }
 
