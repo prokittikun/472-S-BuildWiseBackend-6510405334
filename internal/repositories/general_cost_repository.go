@@ -14,4 +14,7 @@ type GeneralCostRepository interface {
 	GetByID(ctx context.Context, gID uuid.UUID) (*models.GeneralCost, error)
 	Update(ctx context.Context, gID uuid.UUID, req requests.UpdateGeneralCostRequest) error
 	GetType(ctx context.Context) ([]models.Type, error)
+
+	UpdateActualCost(ctx context.Context, gID uuid.UUID, req requests.UpdateActualGeneralCostRequest) error
+	ValidateProjectStatus(ctx context.Context, projectID uuid.UUID) error
 }

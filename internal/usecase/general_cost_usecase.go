@@ -17,6 +17,7 @@ type GeneralCostUseCase interface {
 	Update(ctx context.Context, gID uuid.UUID, req requests.UpdateGeneralCostRequest) error
 
 	GetType(ctx context.Context) ([]models.Type, error)
+	UpdateActualCost(ctx context.Context, gID uuid.UUID, req requests.UpdateActualGeneralCostRequest) error
 }
 
 type generalCostUseCase struct {
@@ -76,4 +77,24 @@ func (u *generalCostUseCase) Update(ctx context.Context, gID uuid.UUID, req requ
 
 func (u *generalCostUseCase) GetType(ctx context.Context) ([]models.Type, error) {
 	return u.generalCostRepo.GetType(ctx)
+}
+
+func (u *generalCostUseCase) UpdateActualCost(ctx context.Context, gID uuid.UUID, req requests.UpdateActualGeneralCostRequest) error {
+	// Basic validation
+	if req.ActualCost < 0 {
+		return errors.New("actual cost must be positive")
+	}
+
+	// Get general cost to check if exists
+	generalCost, err := u.generalCostRepo.GetByID(ctx, gID)
+	if err != nil {
+		return err
+	}
+
+	if generalCost == nil {
+		return errors.New("general cost not found")
+	}
+
+	// Update the actual cost
+	return u.generalCostRepo.UpdateActualCost(ctx, gID, req)
 }

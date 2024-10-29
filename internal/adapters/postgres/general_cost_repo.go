@@ -232,3 +232,113 @@ func (r *generalCostRepository) GetType(ctx context.Context) ([]models.Type, err
 
 	return types, nil
 }
+
+func (r *generalCostRepository) UpdateActualCost(ctx context.Context, gID uuid.UUID, req requests.UpdateActualGeneralCostRequest) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Get project status and validate
+	var projectStatus struct {
+		ProjectStatus   string    `db:"project_status"`
+		BOQStatus       string    `db:"boq_status"`
+		QuotationStatus string    `db:"quotation_status"`
+		BOQID           uuid.UUID `db:"boq_id"`
+	}
+
+	query := `
+        SELECT 
+            p.status as project_status,
+            b.status as boq_status,
+            q.status as quotation_status,
+            b.boq_id
+        FROM general_cost gc
+        JOIN boq b ON b.boq_id = gc.boq_id
+        JOIN project p ON p.project_id = b.project_id
+        LEFT JOIN quotation q ON q.project_id = p.project_id
+        WHERE gc.g_id = $1`
+
+	err = tx.GetContext(ctx, &projectStatus, query, gID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.New("general cost not found")
+		}
+		return fmt.Errorf("failed to get project status: %w", err)
+	}
+
+	// Validate project status
+	if projectStatus.ProjectStatus == "completed" {
+		return errors.New("cannot update actual cost for completed project")
+	}
+
+	// Validate BOQ and Quotation status
+	if projectStatus.BOQStatus != "approved" {
+		return errors.New("BOQ must be approved to update actual cost")
+	}
+	if projectStatus.QuotationStatus != "approved" {
+		return errors.New("Quotation must be approved to update actual cost")
+	}
+
+	// Update actual cost
+	updateQuery := `
+        UPDATE general_cost 
+        SET actual_cost = $1
+        WHERE g_id = $2`
+
+	result, err := tx.ExecContext(ctx, updateQuery, req.ActualCost, gID)
+	if err != nil {
+		return fmt.Errorf("failed to update actual cost: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("general cost not found")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (r *generalCostRepository) ValidateProjectStatus(ctx context.Context, projectID uuid.UUID) error {
+	query := `
+        SELECT 
+            p.status as project_status,
+            b.status as boq_status,
+            q.status as quotation_status
+        FROM project p
+        LEFT JOIN boq b ON b.project_id = p.project_id
+        LEFT JOIN quotation q ON q.project_id = p.project_id
+        WHERE p.project_id = $1`
+
+	var status struct {
+		ProjectStatus   string `db:"project_status"`
+		BOQStatus       string `db:"boq_status"`
+		QuotationStatus string `db:"quotation_status"`
+	}
+
+	err := r.db.GetContext(ctx, &status, query, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to get project status: %w", err)
+	}
+
+	if status.ProjectStatus == "completed" {
+		return errors.New("cannot update actual cost for completed project")
+	}
+	if status.BOQStatus != "approved" {
+		return errors.New("BOQ must be approved to update actual cost")
+	}
+	if status.QuotationStatus != "approved" {
+		return errors.New("Quotation must be approved to update actual cost")
+	}
+
+	return nil
+}

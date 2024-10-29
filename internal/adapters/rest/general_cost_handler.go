@@ -24,6 +24,7 @@ func (h *GeneralCostHandler) GeneralCostRoutes(app *fiber.App) {
 	generalCost.Get("/project/:projectId", h.GetByProjectID)
 	generalCost.Get("/types", h.GetTypes)
 	generalCost.Get("/:id", h.GetByID)
+	generalCost.Put("/:id/actual-cost", h.UpdateActualCost)
 	generalCost.Put("/:id", h.Update)
 }
 
@@ -136,5 +137,51 @@ func (h *GeneralCostHandler) GetTypes(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "General cost types retrieved successfully",
 		"data":    types,
+	})
+}
+
+func (h *GeneralCostHandler) UpdateActualCost(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid general cost ID",
+		})
+	}
+
+	var req requests.UpdateActualGeneralCostRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	err = h.generalCostUseCase.UpdateActualCost(c.Context(), id, req)
+	if err != nil {
+		switch err.Error() {
+		case "general cost not found":
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "General cost not found",
+			})
+		case "cannot update actual cost for completed project":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Cannot update actual cost for completed project",
+			})
+		case "BOQ must be approved to update actual cost":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "BOQ must be approved to update actual cost",
+			})
+		case "Quotation must be approved to update actual cost":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Quotation must be approved to update actual cost",
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Actual cost updated successfully",
 	})
 }

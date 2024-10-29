@@ -15,3 +15,8 @@ type GeneralCostResponse struct {
 type GeneralCostListResponse struct {
 	GeneralCosts []GeneralCostResponse `json:"general_costs"`
 }
+
+type GeneralCostUpdateResponse struct {
+	Message string    `json:"message"`
+	GID     uuid.UUID `json:"g_id"`
+}
