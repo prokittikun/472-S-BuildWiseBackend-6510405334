@@ -24,6 +24,8 @@ func (h *ProjectHandler) ProjectRoutes(app *fiber.App) {
 	project.Post("/", h.Create)
 	project.Get("/", h.List)
 	project.Get("/:id", h.GetByID)
+	project.Put("/:projectId/status", h.UpdateStatus)
+
 	project.Put("/:id/cancel", h.Cancel)
 	project.Put("/:id", h.Update)
 
@@ -158,5 +160,45 @@ func (h *ProjectHandler) Cancel(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Project cancelled successfully",
+	})
+}
+
+func (h *ProjectHandler) UpdateStatus(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("projectId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	var req requests.UpdateProjectStatusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	req.ProjectID = projectID
+
+	if err := h.projectUsecase.UpdateProjectStatus(c.Context(), req); err != nil {
+		switch err.Error() {
+		case "BOQ must be approved", "quotation must be approved":
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		case "project must be in planning status to move to in_progress",
+			"project must be in in_progress status to move to completed":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update project status",
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Project status updated successfully",
 	})
 }

@@ -16,4 +16,8 @@ type ProjectRepository interface {
 	GetByIDWithClient(ctx context.Context, id uuid.UUID) (*models.Project, *models.Client, error)
 	List(ctx context.Context) ([]models.Project, error)
 	Cancel(ctx context.Context, id uuid.UUID) error
+
+	UpdateStatus(ctx context.Context, projectID uuid.UUID, status models.ProjectStatus) error
+	GetProjectStatus(ctx context.Context, projectID uuid.UUID) (*models.ProjectStatusCheck, error)
+	ValidateStatusTransition(ctx context.Context, projectID uuid.UUID, newStatus models.ProjectStatus) error
 }

@@ -19,19 +19,14 @@ The Boonkosang Construction Management Backend is designed to handle essential d
 ## Tech Stack
 
 - **Language:** Go
-- **Database:** SQL (supports various SQL databases)
-- **Libraries & Tools:**
-  - `uuid` for unique document identifiers
-  - `sql.NullFloat64` for handling nullable numeric values
-  - `json.RawMessage` for flexible JSON handling
-  - Modules for document status validation and management, ensuring accurate API responses
+- **Database:** PostgreSQL
 
 ## Getting Started
 
 1. **Clone the Repository:**
 
    ```sh
-   git clone https://github.com/yourusername/boonkosang-construction-be.git
+   git clone https://github.com/beerth21624/boonkosang-construction-be.git
    ```
 
 2. **Install Dependencies:**
@@ -52,4 +47,4 @@ The Boonkosang Construction Management Backend is designed to handle essential d
 
 ## License
 
-This project is open-source and available under the MIT License.
+MIT License.

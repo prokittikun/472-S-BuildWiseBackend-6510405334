@@ -199,3 +199,82 @@ func (r *projectRepository) Cancel(ctx context.Context, id uuid.UUID) error {
 
 	return nil
 }
+
+func (r *projectRepository) GetProjectStatus(ctx context.Context, projectID uuid.UUID) (*models.ProjectStatusCheck, error) {
+	query := `
+        SELECT 
+            p.status as project_status,
+            b.status as boq_status,
+            q.status as quotation_status
+        FROM project p
+        LEFT JOIN boq b ON b.project_id = p.project_id
+        LEFT JOIN quotation q ON q.project_id = p.project_id
+        WHERE p.project_id = $1`
+
+	var status models.ProjectStatusCheck
+	err := r.db.GetContext(ctx, &status, query, projectID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("project not found")
+		}
+		return nil, fmt.Errorf("failed to get project status: %w", err)
+	}
+
+	return &status, nil
+}
+
+func (r *projectRepository) ValidateStatusTransition(ctx context.Context, projectID uuid.UUID, newStatus models.ProjectStatus) error {
+	status, err := r.GetProjectStatus(ctx, projectID)
+	if err != nil {
+		return err
+	}
+
+	// Validate BOQ and Quotation status
+	if !status.BOQStatus.Valid || status.BOQStatus.String != "approved" {
+		return errors.New("BOQ must be approved")
+	}
+	if !status.QuotationStatus.Valid || status.QuotationStatus.String != "approved" {
+		return errors.New("quotation must be approved")
+	}
+
+	// Validate status transitions
+	switch newStatus {
+	case models.ProjectStatusInProgress:
+		if status.ProjectStatus != string(models.ProjectStatusPlanning) {
+			return errors.New("project must be in planning status to move to in_progress")
+		}
+	case models.ProjectStatusCompleted:
+		if status.ProjectStatus != string(models.ProjectStatusInProgress) {
+			return errors.New("project must be in in_progress status to move to completed")
+		}
+	}
+
+	return nil
+}
+
+func (r *projectRepository) UpdateStatus(ctx context.Context, projectID uuid.UUID, status models.ProjectStatus) error {
+	if err := r.ValidateStatusTransition(ctx, projectID, status); err != nil {
+		return err
+	}
+
+	query := `
+        UPDATE project 
+        SET status = $1, updated_at = CURRENT_TIMESTAMP 
+        WHERE project_id = $2`
+
+	result, err := r.db.ExecContext(ctx, query, status, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to update project status: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("project not found")
+	}
+
+	return nil
+}

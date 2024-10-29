@@ -27,3 +27,9 @@ type Project struct {
 	CreatedAt   time.Time       `db:"created_at"`
 	UpdatedAt   sql.NullTime    `db:"updated_at"`
 }
+
+type ProjectStatusCheck struct {
+	ProjectStatus   string         `db:"project_status"`
+	BOQStatus       sql.NullString `db:"boq_status"`
+	QuotationStatus sql.NullString `db:"quotation_status"`
+}
