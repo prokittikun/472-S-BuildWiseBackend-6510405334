@@ -139,8 +139,8 @@ func (u *quotationUsecase) CreateOrGetQuotation(ctx context.Context, projectID u
 	response := u.buildQuotationResponse(quotation, jobs, costs)
 
 	if len(jobs) > 0 {
-		response.SellingGeneralCost = jobs[0].SellingGeneralCost
-		response.TaxPercentage = jobs[0].TaxPercentage
+		response.SellingGeneralCost = jobs[0].SellingGeneralCost.Float64
+		response.TaxPercentage = jobs[0].TaxPercentage.Float64
 	}
 	return response, nil
 }
