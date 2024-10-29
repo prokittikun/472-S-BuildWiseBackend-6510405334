@@ -33,3 +33,17 @@ type ProjectStatusCheck struct {
 	BOQStatus       sql.NullString `db:"boq_status"`
 	QuotationStatus sql.NullString `db:"quotation_status"`
 }
+
+type ProjectOverview struct {
+	QuotationID       uuid.UUID `db:"quotation_id"`
+	BOQID             uuid.UUID `db:"boq_id"`
+	TotalOverallCost  float64   `db:"total_overall_cost"`
+	TotalSellingPrice float64   `db:"total_selling_price"`
+	TaxPercentage     float64   `db:"tax_percentage"`
+	TotalActualCost   float64   `db:"total_actual_cost"`
+}
+
+type ProjectSummary struct {
+	ProjectOverview
+	Jobs []JobSummary
+}

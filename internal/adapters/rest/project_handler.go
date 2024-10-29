@@ -23,6 +23,8 @@ func (h *ProjectHandler) ProjectRoutes(app *fiber.App) {
 
 	project.Post("/", h.Create)
 	project.Get("/", h.List)
+	project.Get("/:projectId/summary", h.GetProjectSummary)
+	project.Get("/:projectId/overview", h.GetProjectOverview)
 	project.Get("/:id", h.GetByID)
 	project.Put("/:projectId/status", h.UpdateStatus)
 
@@ -200,5 +202,61 @@ func (h *ProjectHandler) UpdateStatus(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "Project status updated successfully",
+	})
+}
+
+func (h *ProjectHandler) GetProjectOverview(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("projectId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	overview, err := h.projectUsecase.GetProjectOverview(c.Context(), projectID)
+	if err != nil {
+		if err.Error() == "some materials are missing price information" {
+			return c.Status(fiber.StatusPreconditionFailed).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get project overview",
+			"details": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Project overview retrieved successfully",
+		"data":    overview,
+	})
+}
+
+func (h *ProjectHandler) GetProjectSummary(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("projectId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	summary, err := h.projectUsecase.GetProjectSummary(c.Context(), projectID)
+	if err != nil {
+		switch err.Error() {
+		case "project must be completed to view summary":
+			return c.Status(fiber.StatusPreconditionFailed).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to get project summary",
+				"details": err.Error(),
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Project summary retrieved successfully",
+		"data":    summary,
 	})
 }

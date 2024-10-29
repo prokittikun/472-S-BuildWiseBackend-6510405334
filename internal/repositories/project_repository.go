@@ -20,4 +20,10 @@ type ProjectRepository interface {
 	UpdateStatus(ctx context.Context, projectID uuid.UUID, status models.ProjectStatus) error
 	GetProjectStatus(ctx context.Context, projectID uuid.UUID) (*models.ProjectStatusCheck, error)
 	ValidateStatusTransition(ctx context.Context, projectID uuid.UUID, newStatus models.ProjectStatus) error
+
+	GetProjectOverview(ctx context.Context, projectID uuid.UUID) (*models.ProjectOverview, error)
+	ValidateProjectData(ctx context.Context, projectID uuid.UUID) error
+
+	ValidateProjectStatus(ctx context.Context, projectID uuid.UUID) error
+	GetProjectSummary(ctx context.Context, projectID uuid.UUID) (*models.ProjectSummary, error)
 }

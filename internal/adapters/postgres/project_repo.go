@@ -278,3 +278,187 @@ func (r *projectRepository) UpdateStatus(ctx context.Context, projectID uuid.UUI
 
 	return nil
 }
+
+func (r *projectRepository) ValidateProjectData(ctx context.Context, projectID uuid.UUID) error {
+	query := `
+        SELECT 
+            COUNT(*) as total_materials,
+            COUNT(CASE WHEN estimated_price IS NOT NULL AND actual_price IS NOT NULL THEN 1 END) as filled_materials
+        FROM material_price_log mpl
+        JOIN boq b ON b.boq_id = mpl.boq_id
+        WHERE b.project_id = $1`
+
+	type ValidationResult struct {
+		TotalMaterials  int `db:"total_materials"`
+		FilledMaterials int `db:"filled_materials"`
+	}
+
+	var result ValidationResult
+	if err := r.db.GetContext(ctx, &result, query, projectID); err != nil {
+		return fmt.Errorf("failed to validate project data: %w", err)
+	}
+
+	if result.TotalMaterials == 0 {
+		return errors.New("no materials found for this project")
+	}
+
+	if result.TotalMaterials != result.FilledMaterials {
+		return errors.New("some materials are missing price information")
+	}
+
+	return nil
+}
+
+func (r *projectRepository) GetProjectOverview(ctx context.Context, projectID uuid.UUID) (*models.ProjectOverview, error) {
+	if err := r.ValidateProjectData(ctx, projectID); err != nil {
+		return nil, err
+	}
+
+	query := `
+        WITH MaterialTotals AS (
+            SELECT 
+                job_id,
+                boq_id,
+                SUM(estimated_price * quantity) as total_material_price
+            FROM material_price_log 
+            GROUP BY job_id, boq_id
+        ), GeneralCost AS (
+            SELECT 
+                b.boq_id, 
+                SUM(gc.estimated_cost) as total_estimated_cost, 
+                SUM(gc.actual_cost) as total_actual_cost 
+            FROM boq b 
+            LEFT JOIN general_cost gc ON gc.boq_id = b.boq_id 
+            WHERE b.project_id = $1 
+            GROUP BY b.boq_id
+        ), JobTotals AS (
+            SELECT 
+                b.boq_id, 
+                SUM(bj.selling_price*bj.quantity) as total_selling_price_exclude_gc_cost 
+            FROM boq b 
+            LEFT JOIN boq_job bj ON bj.boq_id = b.boq_id 
+            WHERE b.project_id = $1 
+            GROUP BY b.boq_id
+        ), ActualPriceTotal AS (
+            SELECT 
+                job_id,
+                boq_id,
+                SUM(actual_price * quantity) as total_actual_price
+            FROM material_price_log 
+            GROUP BY job_id, boq_id
+        )
+        SELECT 
+            q.quotation_id, 
+            b.boq_id, 
+            SUM((mt.total_material_price + bj.labor_cost) * bj.quantity) + gc.total_estimated_cost AS total_overall_cost,
+            (jt.total_selling_price_exclude_gc_cost + b.selling_general_cost) as total_selling_price,
+            q.tax_percentage,
+            SUM((apt.total_actual_price + bj.labor_cost) * bj.quantity) + gc.total_actual_cost AS total_actual_cost
+        FROM project p 
+        LEFT JOIN quotation q ON q.project_id = p.project_id 
+        LEFT JOIN boq b ON b.project_id = p.project_id 
+        LEFT JOIN boq_job bj ON bj.boq_id = b.boq_id 
+        LEFT JOIN MaterialTotals mt ON mt.job_id = bj.job_id AND mt.boq_id = bj.boq_id 
+        LEFT JOIN GeneralCost gc ON gc.boq_id = b.boq_id 
+        LEFT JOIN JobTotals jt ON jt.boq_id = b.boq_id 
+        LEFT JOIN ActualPriceTotal apt ON apt.boq_id = bj.boq_id AND apt.job_id = bj.job_id 
+        WHERE p.project_id = $1
+        GROUP BY bj.boq_id, gc.total_estimated_cost, jt.total_selling_price_exclude_gc_cost, 
+                q.tax_percentage, gc.total_actual_cost, q.quotation_id, b.boq_id`
+
+	var overview models.ProjectOverview
+	err := r.db.GetContext(ctx, &overview, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project overview: %w", err)
+	}
+
+	return &overview, nil
+}
+
+func (r *projectRepository) ValidateProjectStatus(ctx context.Context, projectID uuid.UUID) error {
+	var status string
+	query := `SELECT status FROM project WHERE project_id = $1`
+
+	err := r.db.GetContext(ctx, &status, query, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to get project status: %w", err)
+	}
+
+	if status != "completed" {
+		return errors.New("project must be completed to view summary")
+	}
+
+	return nil
+}
+
+func (r *projectRepository) GetProjectSummary(ctx context.Context, projectID uuid.UUID) (*models.ProjectSummary, error) {
+	if err := r.ValidateProjectStatus(ctx, projectID); err != nil {
+		return nil, err
+	}
+
+	// Get project overview first
+	overview, err := r.GetProjectOverview(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get job-level details
+	jobs, err := r.getJobDetails(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.ProjectSummary{
+		ProjectOverview: *overview,
+		Jobs:            jobs,
+	}, nil
+}
+
+func (r *projectRepository) getJobDetails(ctx context.Context, projectID uuid.UUID) ([]models.JobSummary, error) {
+	query := `
+        WITH MaterialTotals AS (
+            SELECT 
+                job_id,  
+                boq_id, 
+                COALESCE(SUM(estimated_price * quantity), 0) as total_material_price, 
+                COALESCE(SUM(actual_price * quantity), 0) as total_actual_price 
+            FROM material_price_log 
+            GROUP BY job_id, boq_id
+        )
+        SELECT 
+            COALESCE(b.selling_general_cost, 0) as selling_general_cost, 
+            q.quotation_id, 
+            q.status, 
+            q.valid_date, 
+            COALESCE(q.tax_percentage, 0) as tax_percentage, 
+            j.name, 
+            j.unit, 
+            bj.quantity, 
+            COALESCE(bj.labor_cost, 0) as labor_cost, 
+            COALESCE(mt.total_material_price, 0) as total_material_price, 
+            COALESCE(mt.total_material_price + bj.labor_cost, 0) as overall_cost, 
+            COALESCE(bj.selling_price, 0) as selling_price,
+            COALESCE(bj.selling_price - (mt.total_material_price + bj.labor_cost), 0) as estimated_profit, 
+            COALESCE(mt.total_actual_price + bj.labor_cost, 0) as overall_actual_price, 
+            COALESCE(bj.selling_price - (mt.total_actual_price + bj.labor_cost), 0) as job_profit, 
+            COALESCE((bj.selling_price - (mt.total_actual_price + bj.labor_cost)) * bj.quantity, 0) as total_profit 
+        FROM project p 
+        LEFT JOIN quotation q ON q.project_id = p.project_id 
+        JOIN boq b ON b.project_id = p.project_id 
+        JOIN boq_job bj ON bj.boq_id = b.boq_id 
+        JOIN job j ON j.job_id = bj.job_id 
+        LEFT JOIN MaterialTotals mt ON mt.job_id = j.job_id AND mt.boq_id = b.boq_id 
+        WHERE p.project_id = $1
+        GROUP BY 
+            q.quotation_id, q.status, q.valid_date, q.tax_percentage,
+            j.name, j.unit, bj.quantity, bj.labor_cost, bj.selling_price, 
+            mt.total_material_price, b.selling_general_cost, mt.total_actual_price`
+
+	var jobs []models.JobSummary
+	err := r.db.SelectContext(ctx, &jobs, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job details: %w", err)
+	}
+
+	return jobs, nil
+}
