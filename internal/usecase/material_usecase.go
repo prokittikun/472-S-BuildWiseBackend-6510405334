@@ -138,6 +138,7 @@ func (u *materialUsecase) GetMaterialPrices(ctx context.Context, projectID uuid.
 			EstimatedPrice: m.EstimatedPrice.Float64,
 			AvgActualPrice: m.AvgActualPrice.Float64,
 			ActualPrice:    m.ActualPrice.Float64,
+			SupplierID:     m.SupplierID.String,
 			SupplierName:   m.SupplierName.String,
 		}
 

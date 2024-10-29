@@ -241,6 +241,7 @@ func (r *materialRepository) GetMaterialPricesByProjectID(ctx context.Context, p
             mpl.estimated_price,
             fa.avg_actual_price,
             mpl.actual_price,
+			s.supplier_id,
             s.name as supplier_name
         FROM project p 
         JOIN boq b ON b.project_id = p.project_id 
@@ -258,6 +259,7 @@ func (r *materialRepository) GetMaterialPricesByProjectID(ctx context.Context, p
             mpl.estimated_price,
             mpl.actual_price, 
             fa.avg_actual_price, 
+			s.supplier_id,
             s.name`
 
 	var materials []models.MaterialPriceInfo

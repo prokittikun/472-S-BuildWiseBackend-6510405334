@@ -16,5 +16,6 @@ type MaterialPriceInfo struct {
 	EstimatedPrice sql.NullFloat64 `db:"estimated_price"`
 	AvgActualPrice sql.NullFloat64 `db:"avg_actual_price"`
 	ActualPrice    sql.NullFloat64 `db:"actual_price"`
+	SupplierID     sql.NullString  `db:"supplier_id"`
 	SupplierName   sql.NullString  `db:"supplier_name"`
 }

@@ -24,6 +24,7 @@ type MaterialPriceDetail struct {
 	EstimatedPrice float64 `json:"estimated_price"`
 	AvgActualPrice float64 `json:"avg_actual_price"`
 	ActualPrice    float64 `json:"actual_price"`
+	SupplierID     string  `json:"supplier_id"`
 	SupplierName   string  `json:"supplier_name"`
 }
 
