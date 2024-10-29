@@ -55,7 +55,8 @@ type QuotationExportData struct {
 	SubTotal  float64 `json:"sub_total"`
 	TaxAmount float64 `json:"tax_amount"`
 
-	JobDetails []JobDetail `json:"jobs"`
+	JobDetails []JobDetail         `json:"jobs"`
+	GenCosts   []GeneralCostDetail `json:"general_costs"`
 
 	FormattedFinalAmount *float64 `json:"final_amount"`
 }
