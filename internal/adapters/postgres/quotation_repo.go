@@ -251,8 +251,8 @@ func (r *quotationRepository) GetQuotationStatus(ctx context.Context, projectID 
 
 	return status, nil
 }
+
 func (r *quotationRepository) GetExportData(ctx context.Context, projectID uuid.UUID) (*responses.QuotationExportData, error) {
-	// Start a transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -292,60 +292,98 @@ func (r *quotationRepository) GetExportData(ctx context.Context, projectID uuid.
 		return nil, fmt.Errorf("failed to get quotation data: %w", err)
 	}
 
-	//get selling general cost
-	query = `SELECT selling_general_cost FROM boq WHERE project_id = $1`
-	err = tx.GetContext(ctx, &data.SellingGeneralCost, query, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get selling general cost: %w", err)
-	}
-
-	// Get job details
-	jobQuery := `
+	// Get detailed job and cost information using the new query structure
+	detailQuery := `
+        WITH MaterialTotals AS (
+            SELECT job_id, boq_id, SUM(estimated_price * quantity) as total_material_price 
+            FROM material_price_log 
+            GROUP BY job_id, boq_id
+        )
         SELECT 
+            b.selling_general_cost,
             j.name,
             j.description,
             j.unit,
             bj.quantity,
             bj.selling_price,
-            CASE 
-                WHEN bj.selling_price IS NOT NULL AND bj.quantity IS NOT NULL 
-                THEN bj.selling_price * bj.quantity 
-                ELSE NULL 
-            END as amount
-        FROM boq b
+            (bj.selling_price * bj.quantity) as amount
+        FROM project p
+        JOIN boq b ON b.project_id = p.project_id
         JOIN boq_job bj ON bj.boq_id = b.boq_id
         JOIN job j ON j.job_id = bj.job_id
-        WHERE b.project_id = $1
-        ORDER BY j.name`
+        LEFT JOIN MaterialTotals mt ON mt.job_id = j.job_id AND mt.boq_id = b.boq_id
+        WHERE p.project_id = $1
+        GROUP BY b.selling_general_cost, j.name, j.description, j.unit, bj.quantity, bj.selling_price`
 
-	err = tx.SelectContext(ctx, &data.JobDetails, jobQuery, projectID)
+	type jobDetailResult struct {
+		SellingGeneralCost float64         `db:"selling_general_cost"`
+		Name               string          `db:"name"`
+		Description        string          `db:"description"`
+		Unit               string          `db:"unit"`
+		Quantity           float64         `db:"quantity"`
+		SellingPrice       sql.NullFloat64 `db:"selling_price"`
+		Amount             sql.NullFloat64 `db:"amount"`
+	}
+
+	var detailResults []jobDetailResult
+	err = tx.SelectContext(ctx, &detailResults, detailQuery, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get job details: %w", err)
 	}
 
-	// Calculate totals
-	var subTotal float64
-	for _, job := range data.JobDetails {
-		if job.Amount.Valid {
-			subTotal += job.Amount.Float64
+	// Process job details and calculate totals
+	data.JobDetails = make([]responses.JobDetail, len(detailResults))
+	var totalSellingPrice float64
+
+	// Set selling general cost from the first result
+	if len(detailResults) > 0 {
+		data.SellingGeneralCost = detailResults[0].SellingGeneralCost
+	}
+
+	for i, result := range detailResults {
+		data.JobDetails[i] = responses.JobDetail{
+			Name:         result.Name,
+			Description:  result.Description,
+			Unit:         result.Unit,
+			Quantity:     result.Quantity,
+			SellingPrice: result.SellingPrice,
+			Amount:       result.Amount,
+		}
+
+		if result.Amount.Valid {
+			totalSellingPrice += result.Amount.Float64
 		}
 	}
-	data.SubTotal = subTotal
+
+	// Calculate subtotal including selling general cost and tax
+	data.SubTotal = data.SellingGeneralCost + totalSellingPrice
 
 	// Calculate tax amount if tax percentage exists
 	if data.TaxPercentage > 0 {
-		data.TaxAmount = subTotal * (data.TaxPercentage / 100)
+		data.TaxAmount = data.SubTotal * data.TaxPercentage / 100
 
 		// Update final amount if not already set
 		if !data.FinalAmount.Valid {
 			data.FinalAmount = sql.NullFloat64{
-				Float64: subTotal + data.TaxAmount,
+				Float64: data.SubTotal + data.TaxAmount,
 				Valid:   true,
 			}
 		}
 	}
 
-	// Commit transaction
+	// Format all nullable fields
+	data.FormatFinalAmount()
+	for i := range data.JobDetails {
+		if data.JobDetails[i].SellingPrice.Valid {
+			value := data.JobDetails[i].SellingPrice.Float64
+			data.JobDetails[i].FormattedSellingPrice = &value
+		}
+		if data.JobDetails[i].Amount.Valid {
+			value := data.JobDetails[i].Amount.Float64
+			data.JobDetails[i].FormattedAmount = &value
+		}
+	}
+
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
