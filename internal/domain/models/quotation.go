@@ -29,6 +29,7 @@ type QuotationJob struct {
 	Status             string          `db:"status"`
 	ValidDate          time.Time       `db:"valid_date"`
 	TaxPercentage      float64         `db:"tax_percentage"`
+	SellingGeneralCost float64         `db:"selling_general_cost"`
 	JobID              uuid.UUID       `db:"job_id"`
 	JobName            string          `db:"name"`
 	Unit               string          `db:"unit"`
@@ -42,10 +43,12 @@ type QuotationJob struct {
 }
 
 type QuotationGeneralCost struct {
-	BOQID         uuid.UUID       `db:"boq_id"`
-	GID           uuid.UUID       `db:"g_id"`
-	TypeName      string          `db:"type_name"`
-	EstimatedCost sql.NullFloat64 `db:"estimated_cost"`
+	BoqID              uuid.UUID  `db:"boq_id"`
+	SellingGeneralCost float64    `db:"selling_general_cost"`
+	TaxPercentage      float64    `db:"tax_percentage"`
+	GID                *uuid.UUID `db:"g_id"`
+	TypeName           *string    `db:"type_name"`
+	EstimatedCost      *float64   `db:"estimated_cost"`
 }
 
 type QuotationExportData struct {

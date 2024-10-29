@@ -10,11 +10,13 @@ import (
 )
 
 type QuotationResponse struct {
-	QuotationID uuid.UUID            `json:"quotation_id"`
-	Status      string               `json:"status"`
-	ValidDate   time.Time            `json:"valid_date"`
-	Jobs        []QuotationJobDetail `json:"jobs"`
-	Costs       []GeneralCostDetail  `json:"general_costs"`
+	QuotationID        uuid.UUID            `json:"quotation_id"`
+	Status             string               `json:"status"`
+	ValidDate          time.Time            `json:"valid_date"`
+	TaxPercentage      float64              `json:"tax_percentage"`
+	SellingGeneralCost float64              `json:"selling_general_cost"`
+	Jobs               []QuotationJobDetail `json:"jobs"`
+	Costs              []GeneralCostDetail  `json:"general_costs"`
 }
 
 type QuotationJobDetail struct {

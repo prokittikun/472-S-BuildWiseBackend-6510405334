@@ -79,18 +79,19 @@ func (u *quotationUsecase) buildQuotationResponse(
 	// Process general costs
 	var totalGeneralCost float64
 	for _, cost := range costs {
-		if cost.EstimatedCost.Valid {
+		if cost.EstimatedCost != nil {
 			costDetail := responses.GeneralCostDetail{
-				TypeName:      cost.TypeName,
-				EstimatedCost: cost.EstimatedCost.Float64,
+				TypeName:      *cost.TypeName,
+				EstimatedCost: *cost.EstimatedCost,
 			}
-			totalGeneralCost += cost.EstimatedCost.Float64
+			totalGeneralCost += *cost.EstimatedCost
 			response.Costs = append(response.Costs, costDetail)
 		}
 	}
 
 	return response
 }
+
 func getValidTime(nullTime sql.NullTime) time.Time {
 	if nullTime.Valid {
 		return nullTime.Time
@@ -136,6 +137,11 @@ func (u *quotationUsecase) CreateOrGetQuotation(ctx context.Context, projectID u
 
 	// Build response
 	response := u.buildQuotationResponse(quotation, jobs, costs)
+
+	if len(jobs) > 0 {
+		response.SellingGeneralCost = jobs[0].SellingGeneralCost
+		response.TaxPercentage = jobs[0].TaxPercentage
+	}
 	return response, nil
 }
 
