@@ -13,7 +13,7 @@ type CompanyResponse struct {
 	Tel       string          `json:"tel"`
 	Address   json.RawMessage `json:"address"`
 	TaxID     string          `json:"tax_id"`
-	IsNew     bool            `json:"is_new"`
+	IsNew     bool            `json:"-"`
 }
 
 // Example API response structures
