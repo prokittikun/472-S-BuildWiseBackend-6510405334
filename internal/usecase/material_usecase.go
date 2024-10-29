@@ -46,7 +46,7 @@ func (u *materialUsecase) Create(ctx context.Context, req requests.CreateMateria
 		return nil, fmt.Errorf("failed to create material: %w", err)
 	}
 
-	return u.createMaterialResponse(ctx, material)
+	return u.createMaterialResponse(material)
 }
 
 func (u *materialUsecase) Update(ctx context.Context, materialID string, req requests.UpdateMaterialRequest) error {
@@ -82,7 +82,7 @@ func (u *materialUsecase) GetByID(ctx context.Context, materialID string) (*resp
 		return nil, errors.New("material not found")
 	}
 
-	return u.createMaterialResponse(ctx, material)
+	return u.createMaterialResponse(material)
 }
 
 func (u *materialUsecase) List(ctx context.Context) (*responses.MaterialListResponse, error) {
@@ -93,7 +93,7 @@ func (u *materialUsecase) List(ctx context.Context) (*responses.MaterialListResp
 
 	var materialResponses []*responses.MaterialResponse
 	for _, material := range materials {
-		materialResponse, err := u.createMaterialResponse(ctx, &material)
+		materialResponse, err := u.createMaterialResponse(&material)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create material response: %w", err)
 		}
@@ -111,7 +111,7 @@ func (u *materialUsecase) List(ctx context.Context) (*responses.MaterialListResp
 
 }
 
-func (u *materialUsecase) createMaterialResponse(ctx context.Context, material *models.Material) (*responses.MaterialResponse, error) {
+func (u *materialUsecase) createMaterialResponse(material *models.Material) (*responses.MaterialResponse, error) {
 
 	return &responses.MaterialResponse{
 		MaterialID: material.MaterialID,
