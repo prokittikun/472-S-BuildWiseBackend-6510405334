@@ -401,8 +401,9 @@ func (r *jobRepository) DeleteJobMaterial(ctx context.Context, jobID uuid.UUID, 
 }
 
 func (r *jobRepository) UpdateJobMaterialQuantity(ctx context.Context, jobID uuid.UUID, req requests.UpdateJobMaterialQuantityRequest) error {
-	query := `
-		UPDATE Job_material 
+
+	updateJobMaterialQuery := `
+		UPDATE job_material 
 		SET quantity = :quantity
 		WHERE job_id = :job_id AND material_id = :material_id`
 
@@ -412,7 +413,7 @@ func (r *jobRepository) UpdateJobMaterialQuantity(ctx context.Context, jobID uui
 		"quantity":    req.Quantity,
 	}
 
-	result, err := r.db.NamedExecContext(ctx, query, params)
+	result, err := r.db.NamedExecContext(ctx, updateJobMaterialQuery, params)
 	if err != nil {
 		return fmt.Errorf("failed to update material quantity: %w", err)
 	}
@@ -426,5 +427,39 @@ func (r *jobRepository) UpdateJobMaterialQuantity(ctx context.Context, jobID uui
 		return errors.New("job material not found")
 	}
 
+	updateMaterialPriceLogQuery := `
+		UPDATE material_price_log mpl 
+		SET quantity = :quantity
+		WHERE mpl.job_id = :job_id 
+		AND mpl.material_id = :material_id 
+		AND boq_id IN (
+			SELECT b.boq_id 
+			FROM boq b 
+			JOIN boq_job bj ON b.boq_id = bj.boq_id 
+			JOIN job_material jm ON jm.job_id = bj.job_id 
+			WHERE jm.job_id = :job_id 
+			AND jm.material_id = :material_id 
+			AND b.status = 'draft'
+		)`
+
+	_, err = r.db.NamedExecContext(ctx, updateMaterialPriceLogQuery, params)
+	if err != nil {
+		return fmt.Errorf("failed to update material price log: %w", err)
+	}
+
 	return nil
+}
+
+// validateQuantity checks if quantity is valid (not null and positive integer)
+func validateQuantity(quantity int) error {
+	if quantity <= 0 {
+		return errors.New("quantity must be a positive integer")
+	}
+	return nil
+}
+
+// UpdateJobMaterialQuantityRequest struct should look like this:
+type UpdateJobMaterialQuantityRequest struct {
+	MaterialID uuid.UUID `json:"material_id" validate:"required"`
+	Quantity   int       `json:"quantity" validate:"required,gt=0"`
 }
