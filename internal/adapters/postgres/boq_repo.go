@@ -207,7 +207,27 @@ func (r *boqRepository) AddBOQJob(ctx context.Context, boqID uuid.UUID, req requ
 		return errors.New("can only add jobs to BOQ in draft status")
 	}
 
-	// 16.2 Insert into boq_job
+	// Validate input
+	if req.Quantity <= 0 || req.LaborCost <= 0 {
+		return errors.New("quantity and labor cost must be positive numbers")
+	}
+
+	// Check if job already exists in BOQ
+	var exists bool
+	checkJobQuery := `
+        SELECT EXISTS (
+            SELECT 1 FROM boq_job 
+            WHERE boq_id = $1 AND job_id = $2
+        )`
+	err = tx.GetContext(ctx, &exists, checkJobQuery, boqID, req.JobID)
+	if err != nil {
+		return fmt.Errorf("failed to check job existence: %w", err)
+	}
+	if exists {
+		return errors.New("job already exists in this BOQ")
+	}
+
+	// Insert into boq_job
 	insertBOQJobQuery := `
         INSERT INTO boq_job (
             boq_id, job_id, quantity, labor_cost
@@ -225,7 +245,7 @@ func (r *boqRepository) AddBOQJob(ctx context.Context, boqID uuid.UUID, req requ
 		return fmt.Errorf("failed to add job to BOQ: %w", err)
 	}
 
-	// 16.3 Get materials for the job and add to material_price_log if not exists
+	// Get all materials for the job
 	materialQuery := `
         SELECT material_id, quantity 
         FROM job_material 
@@ -242,41 +262,57 @@ func (r *boqRepository) AddBOQJob(ctx context.Context, boqID uuid.UUID, req requ
 		return fmt.Errorf("failed to get job materials: %w", err)
 	}
 
-	// For each material, check if it exists in material_price_log
+	// Get existing materials in BOQ with their estimated prices
+	type ExistingMaterial struct {
+		MaterialID     sql.NullString  `db:"material_id"`
+		EstimatedPrice sql.NullFloat64 `db:"estimated_price"`
+	}
+
+	// แก้ไข query ให้ชัดเจนขึ้นว่าต้องการข้อมูลอะไร และจัดการกับ NULL
+	existingMaterialsQuery := `
+    SELECT DISTINCT 
+        mpl.material_id, 
+        mpl.estimated_price 
+    FROM boq_job bj 
+    INNER JOIN material_price_log mpl 
+        ON mpl.boq_id = bj.boq_id
+        AND mpl.job_id = bj.job_id 
+    WHERE bj.boq_id = $1
+    AND mpl.material_id IS NOT NULL`
+
+	var existingMaterials []ExistingMaterial
+	err = tx.SelectContext(ctx, &existingMaterials, existingMaterialsQuery, boqID)
+	if err != nil {
+		return fmt.Errorf("failed to get existing materials: %w", err)
+	}
+
+	// Create map for quick lookup of estimated prices
+	estimatedPrices := make(map[string]sql.NullFloat64)
+	for _, em := range existingMaterials {
+		if em.MaterialID.Valid {
+			estimatedPrices[em.MaterialID.String] = em.EstimatedPrice
+		}
+	}
+	// Add material_price_log entries
 	for _, material := range materials {
-		// Check if material price log exists
-		var exists bool
-		checkExistsQuery := `
-            SELECT EXISTS(
-                SELECT 1 
-                FROM material_price_log 
-                WHERE boq_id = $1 
-                AND material_id = $2 
-                AND job_id = $3
+		insertPriceLogQuery := `
+            INSERT INTO material_price_log (
+                material_id, boq_id, job_id, quantity, estimated_price, updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, CURRENT_TIMESTAMP
             )`
 
-		err = tx.GetContext(ctx, &exists, checkExistsQuery, boqID, material.MaterialID, req.JobID)
+		estimatedPrice := estimatedPrices[material.MaterialID]
+
+		_, err = tx.ExecContext(ctx, insertPriceLogQuery,
+			material.MaterialID,
+			boqID,
+			req.JobID,
+			material.Quantity,
+			estimatedPrice,
+		)
 		if err != nil {
-			return fmt.Errorf("failed to check material price log existence: %w", err)
-		}
-
-		if !exists {
-			insertPriceLogQuery := `
-                INSERT INTO material_price_log (
-                    material_id, boq_id, job_id, quantity, updated_at
-                ) VALUES (
-                    $1, $2, $3, $4, CURRENT_TIMESTAMP
-                )`
-
-			_, err = tx.ExecContext(ctx, insertPriceLogQuery,
-				material.MaterialID,
-				boqID,
-				req.JobID,
-				material.Quantity,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to create material price log: %w", err)
-			}
+			return fmt.Errorf("failed to create material price log: %w", err)
 		}
 	}
 

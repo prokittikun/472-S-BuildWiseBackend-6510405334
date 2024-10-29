@@ -165,16 +165,13 @@ func transformMaterials(materials []models.BOQMaterialDetails) []responses.Mater
 	return dtos
 }
 
-// Update calculateSummaryMetrics to handle the new structure
 func calculateSummaryMetrics(generalCosts []responses.GeneralCostDTO, details []responses.BOQDetailDTO) responses.SummaryMetrics {
 	var metrics responses.SummaryMetrics
 
-	// Calculate total general cost
 	for _, cost := range generalCosts {
 		metrics.TotalGeneralCost += cost.EstimatedCost
 	}
 
-	// Calculate totals from details and their materials
 	for _, detail := range details {
 		metrics.TotalLaborCost += detail.TotalLaborCost
 		metrics.TotalEstimatedPrice += detail.TotalEstimatedPrice
@@ -186,7 +183,6 @@ func calculateSummaryMetrics(generalCosts []responses.GeneralCostDTO, details []
 		}
 	}
 
-	// Calculate grand total
 	metrics.GrandTotal = metrics.TotalGeneralCost + metrics.TotalLaborCost + metrics.TotalMaterialCost
 
 	return metrics

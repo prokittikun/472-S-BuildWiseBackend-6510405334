@@ -33,8 +33,3 @@ type UpdateJobMaterialQuantityRequest struct {
 	MaterialID string    `json:"material_id" validate:"required"`
 	Quantity   float64   `json:"quantity" validate:"required,gt=0"`
 }
-type BOQJobRequest struct {
-	JobID     uuid.UUID `json:"job_id" validate:"required"`
-	Quantity  int       `json:"quantity" validate:"required,gt=0"`
-	LaborCost float64   `json:"labor_cost" validate:"required,gte=0"`
-}
