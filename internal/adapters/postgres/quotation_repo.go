@@ -288,6 +288,13 @@ func (r *quotationRepository) GetExportData(ctx context.Context, projectID uuid.
 		return nil, fmt.Errorf("failed to get quotation data: %w", err)
 	}
 
+	//get selling general cost
+	query = `SELECT selling_general_cost FROM boq WHERE project_id = $1`
+	err = tx.GetContext(ctx, &data.SellingGeneralCost, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get selling general cost: %w", err)
+	}
+
 	// Get job details
 	jobQuery := `
         SELECT 
