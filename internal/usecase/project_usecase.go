@@ -7,6 +7,7 @@ import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -164,63 +165,60 @@ func (u *projectUsecase) GetProjectOverview(ctx context.Context, projectID uuid.
 		return nil, fmt.Errorf("failed to get project overview: %w", err)
 	}
 
-	// Calculate derived values
-	taxAmount := overview.TotalSellingPrice * (overview.TaxPercentage / 100)
-	totalWithTax := overview.TotalSellingPrice + taxAmount
-	estimatedProfit := overview.TotalSellingPrice - overview.TotalOverallCost
-	estimatedMargin := (estimatedProfit / overview.TotalSellingPrice) * 100
-	actualProfit := overview.TotalSellingPrice - overview.TotalActualCost
-	actualMargin := (actualProfit / overview.TotalSellingPrice) * 100
+	return toOverviewResponse(overview), nil
+}
+func toOverviewResponse(overview *models.ProjectOverview) *responses.ProjectOverviewResponse {
+	// Safely get values from NullFloat64, defaulting to 0 if null
+	totalOverallCost := getFloat64Value(overview.TotalOverallCost)
+	totalSellingPrice := getFloat64Value(overview.TotalSellingPrice)
+	totalActualCost := getFloat64Value(overview.TotalActualCost)
+	taxPercentage := getFloat64Value(overview.TaxPercentage)
+
+	// Calculate tax and totals
+	taxAmount := calculateTaxAmount(totalSellingPrice, taxPercentage)
+	totalWithTax := totalSellingPrice + taxAmount
+
+	// Calculate profits
+	estimatedProfit := totalSellingPrice - totalOverallCost
+	actualProfit := totalSellingPrice - totalActualCost
+
+	// Calculate margins safely
+	estimatedMargin := calculateMargin(estimatedProfit, totalSellingPrice)
+	actualMargin := calculateMargin(actualProfit, totalSellingPrice)
 
 	return &responses.ProjectOverviewResponse{
 		QuotationID:       overview.QuotationID.String(),
 		BOQID:             overview.BOQID.String(),
-		TotalOverallCost:  overview.TotalOverallCost,
-		TotalSellingPrice: overview.TotalSellingPrice,
-		TotalActualCost:   overview.TotalActualCost,
+		TotalOverallCost:  totalOverallCost,
+		TotalSellingPrice: totalSellingPrice,
+		TotalActualCost:   totalActualCost,
 		TaxAmount:         taxAmount,
 		TotalWithTax:      totalWithTax,
 		EstimatedProfit:   estimatedProfit,
 		EstimatedMargin:   estimatedMargin,
 		ActualProfit:      actualProfit,
 		ActualMargin:      actualMargin,
-	}, nil
+	}
 }
 
-// usecase/project_summary_usecase.go
+// Helper functions for safe calculations
 
-// toOverviewResponse converts ProjectOverview to ProjectOverviewResponse
-func toOverviewResponse(overview *models.ProjectOverview) responses.ProjectOverviewResponse {
-	// Calculate tax and totals
-	taxAmount := overview.TotalSellingPrice * (overview.TaxPercentage / 100)
-	totalWithTax := overview.TotalSellingPrice + taxAmount
-
-	// Calculate profits and margins
-	estimatedProfit := overview.TotalSellingPrice - overview.TotalOverallCost
-	estimatedMargin := 0.0
-	if overview.TotalSellingPrice > 0 {
-		estimatedMargin = (estimatedProfit / overview.TotalSellingPrice) * 100
+func getFloat64Value(n sql.NullFloat64) float64 {
+	if !n.Valid {
+		return 0
 	}
+	return n.Float64
+}
 
-	actualProfit := overview.TotalSellingPrice - overview.TotalActualCost
-	actualMargin := 0.0
-	if overview.TotalSellingPrice > 0 {
-		actualMargin = (actualProfit / overview.TotalSellingPrice) * 100
-	}
+func calculateTaxAmount(price, taxPercentage float64) float64 {
+	return price * (taxPercentage / 100)
+}
 
-	return responses.ProjectOverviewResponse{
-		QuotationID:       overview.QuotationID.String(),
-		BOQID:             overview.BOQID.String(),
-		TotalOverallCost:  overview.TotalOverallCost,
-		TotalSellingPrice: overview.TotalSellingPrice,
-		TotalActualCost:   overview.TotalActualCost,
-		TaxAmount:         taxAmount,
-		TotalWithTax:      totalWithTax,
-		EstimatedProfit:   estimatedProfit,
-		EstimatedMargin:   estimatedMargin,
-		ActualProfit:      actualProfit,
-		ActualMargin:      actualMargin,
+func calculateMargin(profit, totalPrice float64) float64 {
+	if totalPrice == 0 {
+		return 0
 	}
+	return (profit / totalPrice) * 100
 }
 
 // Updated GetProjectSummary method to use the helper function
@@ -303,7 +301,7 @@ func (u *projectUsecase) GetProjectSummary(ctx context.Context, projectID uuid.U
 	return &responses.ProjectSummaryResponse{
 		ProjectID:   project.ProjectID.String(),
 		ProjectName: project.Name,
-		Overview:    toOverviewResponse(&summary.ProjectOverview),
+		Overview:    *toOverviewResponse(&summary.ProjectOverview),
 		Jobs:        jobResponses,
 		TotalStats:  totalStats,
 	}, nil

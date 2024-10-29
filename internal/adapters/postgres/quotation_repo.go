@@ -433,7 +433,7 @@ func (r *quotationRepository) UpdateProjectSellingPrice(ctx context.Context, req
         WITH ProjectCostData AS (
             SELECT 
                 q.tax_percentage, 
-                SUM((bj.selling_price * bj.quantity) + b.selling_general_cost) as total_selling_price 
+                SUM(bj.selling_price * bj.quantity) + b.selling_general_cost as total_selling_price 
             FROM project p 
             JOIN boq b ON b.project_id = p.project_id 
             JOIN quotation q ON q.project_id = p.project_id 
