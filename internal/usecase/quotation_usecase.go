@@ -18,7 +18,7 @@ import (
 type QuotationUsecase interface {
 	CreateOrGetQuotation(ctx context.Context, projectID uuid.UUID) (*responses.QuotationResponse, error)
 	ApproveQuotation(ctx context.Context, projectID uuid.UUID) error
-	ExportQuotation(ctx context.Context, projectID uuid.UUID) (*models.QuotationExportData, error)
+	ExportQuotation(ctx context.Context, projectID uuid.UUID) (*responses.QuotationExportData, error)
 
 	UpdateProjectSellingPrice(ctx context.Context, req requests.UpdateProjectSellingPriceRequest) error
 }
@@ -178,9 +178,8 @@ func (u *quotationUsecase) ApproveQuotation(ctx context.Context, projectID uuid.
 	return nil
 }
 
-func (u *quotationUsecase) ExportQuotation(ctx context.Context, projectID uuid.UUID) (*models.QuotationExportData, error) {
+func (u *quotationUsecase) ExportQuotation(ctx context.Context, projectID uuid.UUID) (*responses.QuotationExportData, error) {
 
-	// Check BOQ status
 	boqStatus, err := u.quotationRepo.CheckBOQStatus(ctx, projectID)
 	if err != nil {
 		return nil, err
@@ -199,14 +198,21 @@ func (u *quotationUsecase) ExportQuotation(ctx context.Context, projectID uuid.U
 		return nil, errors.New("only approved quotations can be exported")
 	}
 
-	// Get export data
 	exportData, err := u.quotationRepo.GetExportData(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
-	return exportData, nil
+	exportData.FormatFinalAmount()
 
+	//format job details
+	for job := range exportData.JobDetails {
+		jobDetail := &exportData.JobDetails[job]
+		jobDetail.FormatSellingPrice()
+		jobDetail.FormatAmount()
+	}
+
+	return exportData, nil
 }
 
 func (u *quotationUsecase) UpdateProjectSellingPrice(ctx context.Context, req requests.UpdateProjectSellingPriceRequest) error {

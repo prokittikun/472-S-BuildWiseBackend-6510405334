@@ -4,6 +4,7 @@ import (
 	"boonkosang/internal/domain/models"
 	"boonkosang/internal/repositories"
 	"boonkosang/internal/requests"
+	"boonkosang/internal/responses"
 	"context"
 	"database/sql"
 	"errors"
@@ -246,7 +247,14 @@ func (r *quotationRepository) GetQuotationStatus(ctx context.Context, projectID 
 
 	return status, nil
 }
-func (r *quotationRepository) GetExportData(ctx context.Context, projectID uuid.UUID) (*models.QuotationExportData, error) {
+func (r *quotationRepository) GetExportData(ctx context.Context, projectID uuid.UUID) (*responses.QuotationExportData, error) {
+	// Start a transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	// Get main quotation data
 	query := `
         SELECT 
@@ -267,31 +275,68 @@ func (r *quotationRepository) GetExportData(ctx context.Context, projectID uuid.
         FROM project p
         LEFT JOIN client c ON c.client_id = p.client_id
         LEFT JOIN quotation q ON q.project_id = p.project_id
-        WHERE p.project_id = $1`
+        WHERE p.project_id = $1
+            AND q.status = 'approved'
+        LIMIT 1`
 
-	var data models.QuotationExportData
-	err := r.db.GetContext(ctx, &data, query, projectID)
+	var data responses.QuotationExportData
+	err = tx.GetContext(ctx, &data, query, projectID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("approved quotation not found")
+		}
 		return nil, fmt.Errorf("failed to get quotation data: %w", err)
 	}
 
-	// Get job details with COALESCE for NULL handling
+	// Get job details
 	jobQuery := `
         SELECT 
             j.name,
+            j.description,
             j.unit,
             bj.quantity,
             bj.selling_price,
-            COALESCE(bj.selling_price * bj.quantity, 0) as amount
+            CASE 
+                WHEN bj.selling_price IS NOT NULL AND bj.quantity IS NOT NULL 
+                THEN bj.selling_price * bj.quantity 
+                ELSE NULL 
+            END as amount
         FROM boq b
         JOIN boq_job bj ON bj.boq_id = b.boq_id
         JOIN job j ON j.job_id = bj.job_id
         WHERE b.project_id = $1
         ORDER BY j.name`
 
-	err = r.db.SelectContext(ctx, &data.JobDetails, jobQuery, projectID)
+	err = tx.SelectContext(ctx, &data.JobDetails, jobQuery, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get job details: %w", err)
+	}
+
+	// Calculate totals
+	var subTotal float64
+	for _, job := range data.JobDetails {
+		if job.Amount.Valid {
+			subTotal += job.Amount.Float64
+		}
+	}
+	data.SubTotal = subTotal
+
+	// Calculate tax amount if tax percentage exists
+	if data.TaxPercentage > 0 {
+		data.TaxAmount = subTotal * (data.TaxPercentage / 100)
+
+		// Update final amount if not already set
+		if !data.FinalAmount.Valid {
+			data.FinalAmount = sql.NullFloat64{
+				Float64: subTotal + data.TaxAmount,
+				Valid:   true,
+			}
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return &data, nil
