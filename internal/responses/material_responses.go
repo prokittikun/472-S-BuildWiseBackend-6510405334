@@ -1,5 +1,7 @@
 package responses
 
+import "github.com/google/uuid"
+
 type MaterialResponse struct {
 	MaterialID string `json:"material_id"`
 	Name       string `json:"name"`
@@ -23,4 +25,10 @@ type MaterialPriceDetail struct {
 	AvgActualPrice float64 `json:"avg_actual_price"`
 	ActualPrice    float64 `json:"actual_price"`
 	SupplierName   string  `json:"supplier_name"`
+}
+
+type MaterialActualPriceResponse struct {
+	MaterialID  string    `json:"material_id"`
+	ActualPrice float64   `json:"actual_price"`
+	SupplierID  uuid.UUID `json:"supplier_id"`
 }

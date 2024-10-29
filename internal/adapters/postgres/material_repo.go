@@ -206,7 +206,7 @@ func (r *materialRepository) List(ctx context.Context) ([]models.Material, error
 	return materials, nil
 }
 
-func (r *materialRepository) GetMaterialPricesByProjectID(ctx context.Context, projectID uuid.UUID) ([]repositories.MaterialPriceInfo, error) {
+func (r *materialRepository) GetMaterialPricesByProjectID(ctx context.Context, projectID uuid.UUID) ([]models.MaterialPriceInfo, error) {
 	query := `
         WITH LatestMaterialPrices AS (
             SELECT 
@@ -260,7 +260,7 @@ func (r *materialRepository) GetMaterialPricesByProjectID(ctx context.Context, p
             fa.avg_actual_price, 
             s.name`
 
-	var materials []repositories.MaterialPriceInfo
+	var materials []models.MaterialPriceInfo
 	err := r.db.SelectContext(ctx, &materials, query, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get material prices: %w", err)
@@ -302,6 +302,95 @@ func (r *materialRepository) GetBOQStatus(ctx context.Context, boqID uuid.UUID) 
 			return "", errors.New("BOQ not found")
 		}
 		return "", fmt.Errorf("failed to get BOQ status: %w", err)
+	}
+
+	return status, nil
+}
+
+func (r *materialRepository) UpdateActualPrice(ctx context.Context, boqID uuid.UUID, req requests.UpdateMaterialActualPriceRequest) error {
+	query := `
+        UPDATE material_price_log 
+        SET actual_price = :actual_price, 
+            supplier_id = :supplier_id,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE material_id = :material_id 
+        AND boq_id = :boq_id`
+
+	params := map[string]interface{}{
+		"material_id":  req.MaterialID,
+		"boq_id":       boqID,
+		"actual_price": req.ActualPrice,
+		"supplier_id":  req.SupplierID,
+	}
+
+	result, err := r.db.NamedExecContext(ctx, query, params)
+	if err != nil {
+		return fmt.Errorf("failed to update actual price: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("no material price records found to update")
+	}
+
+	return nil
+}
+
+func (r *materialRepository) GetProjectStatus(ctx context.Context, BOQId uuid.UUID) (string, error) {
+
+	var projectID uuid.UUID
+	queryProjectId := `SELECT project_id FROM boq WHERE boq_id = $1`
+
+	err := r.db.GetContext(ctx, &projectID, queryProjectId, BOQId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", errors.New("BOQ not found")
+		}
+		return "", fmt.Errorf("failed to get project ID: %w", err)
+	}
+
+	var status string
+	query := `SELECT status FROM project WHERE project_id = $1`
+
+	err = r.db.GetContext(ctx, &status, query, projectID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", errors.New("project not found")
+		}
+		return "", fmt.Errorf("failed to get project status: %w", err)
+	}
+
+	return status, nil
+}
+
+func (r *materialRepository) GetQuotationStatus(ctx context.Context, BOQId uuid.UUID) (string, error) {
+	var projectID uuid.UUID
+	queryProjectId := `SELECT project_id FROM boq WHERE boq_id = $1`
+
+	err := r.db.GetContext(ctx, &projectID, queryProjectId, BOQId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", errors.New("BOQ not found")
+		}
+		return "", fmt.Errorf("failed to get project ID: %w", err)
+	}
+	var status string
+	query := `
+        SELECT status 
+        FROM quotation 
+        WHERE project_id = $1 
+        LIMIT 1`
+
+	err = r.db.GetContext(ctx, &status, query, projectID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", errors.New("quotation not found")
+		}
+		return "", fmt.Errorf("failed to get quotation status: %w", err)
 	}
 
 	return status, nil

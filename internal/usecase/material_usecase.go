@@ -22,6 +22,7 @@ type MaterialUsecase interface {
 
 	GetMaterialPrices(ctx context.Context, projectID uuid.UUID) (*responses.MaterialPriceListResponse, error)
 	UpdateEstimatedPrice(ctx context.Context, boqID uuid.UUID, req requests.UpdateMaterialEstimatedPriceRequest) error
+	UpdateActualPrice(ctx context.Context, boqID uuid.UUID, req requests.UpdateMaterialActualPriceRequest) error
 }
 
 type materialUsecase struct {
@@ -165,4 +166,43 @@ func (u *materialUsecase) UpdateEstimatedPrice(ctx context.Context, boqID uuid.U
 	}
 
 	return u.materialRepo.UpdateEstimatedPrices(ctx, boqID, req.MaterialID, req.EstimatedPrice)
+}
+
+func (u *materialUsecase) UpdateActualPrice(ctx context.Context, boqID uuid.UUID, req requests.UpdateMaterialActualPriceRequest) error {
+	// Get BOQ status
+	status, err := u.materialRepo.GetBOQStatus(ctx, boqID)
+	if err != nil {
+		return err
+	}
+
+	if status != "approved" {
+		return errors.New("can only update actual prices for approved BOQ")
+	}
+
+	// Get project status
+	projectStatus, err := u.materialRepo.GetProjectStatus(ctx, boqID)
+	if err != nil {
+		return err
+	}
+
+	if projectStatus == "completed" {
+		return errors.New("cannot update actual prices for completed projects")
+	}
+
+	// Get quotation status
+	quotationStatus, err := u.materialRepo.GetQuotationStatus(ctx, boqID)
+	if err != nil {
+		return err
+	}
+
+	if quotationStatus != "approved" {
+		return errors.New("can only update actual prices when quotation is approved")
+	}
+
+	// Validate actual price
+	if req.ActualPrice <= 0 {
+		return errors.New("actual price must be greater than 0")
+	}
+
+	return u.materialRepo.UpdateActualPrice(ctx, boqID, req)
 }
