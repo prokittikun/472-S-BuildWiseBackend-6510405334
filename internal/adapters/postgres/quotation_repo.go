@@ -439,7 +439,7 @@ func (r *quotationRepository) UpdateProjectSellingPrice(ctx context.Context, req
             JOIN quotation q ON q.project_id = p.project_id 
             LEFT JOIN boq_job bj ON bj.boq_id = b.boq_id 
             WHERE p.project_id = $1 
-            GROUP BY bj.boq_id, q.tax_percentage
+            GROUP BY bj.boq_id, q.tax_percentage , b.selling_general_cost
         )
         UPDATE quotation 
         SET final_amount = (
