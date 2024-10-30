@@ -166,7 +166,7 @@ func (r *projectRepository) List(ctx context.Context) ([]models.Project, error) 
 	var projects []models.Project
 
 	query := `
-		SELECT * FROM Project 
+		SELECT * FROM Project ORDER BY created_at DESC
 	`
 
 	err := r.db.SelectContext(ctx, &projects, query)
