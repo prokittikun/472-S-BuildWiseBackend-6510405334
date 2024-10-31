@@ -316,8 +316,6 @@ func (r *jobRepository) AddJobMaterial(ctx context.Context, jobID uuid.UUID, req
 			"quantity":    material.Quantity,
 		}
 
-		fmt.Print(params)
-
 		_, err := tx.NamedExecContext(ctx, insertJobMaterialQuery, params)
 		fmt.Print(err)
 

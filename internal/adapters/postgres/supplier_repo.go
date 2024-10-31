@@ -70,8 +70,6 @@ func (r *supplierRepository) Update(ctx context.Context, id uuid.UUID, req reque
             address = :address
         WHERE supplier_id = :supplier_id`
 
-	fmt.Print(id)
-
 	params := map[string]interface{}{
 		"supplier_id": id,
 		"name":        req.Name,
@@ -81,7 +79,6 @@ func (r *supplierRepository) Update(ctx context.Context, id uuid.UUID, req reque
 	}
 
 	result, err := r.db.NamedExecContext(ctx, query, params)
-	fmt.Print(err)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique constraint") {
 			return errors.New("supplier with this email already exists")

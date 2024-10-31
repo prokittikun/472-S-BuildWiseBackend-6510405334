@@ -100,11 +100,8 @@ func (r *boqRepository) GetBoqWithProject(ctx context.Context, projectID uuid.UU
 		WHERE project_id = $1`
 
 	err = tx.GetContext(ctx, &data, boqQuery, projectID)
-	fmt.Print(data)
-	fmt.Print(err)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			fmt.Print("create new boq")
 			// Create new BOQ if it doesn't exist
 			createBOQQuery := `
                 INSERT INTO Boq (project_id, status, selling_general_cost) 
@@ -133,7 +130,6 @@ func (r *boqRepository) GetBoqWithProject(ctx context.Context, projectID uuid.UU
 			return nil, fmt.Errorf("failed to check BOQ existence: %w", err)
 		}
 	}
-	fmt.Print(data)
 
 	// Convert to response struct
 	response := &responses.BOQResponse{

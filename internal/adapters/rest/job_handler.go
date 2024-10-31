@@ -3,7 +3,6 @@ package rest
 import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/usecase"
-	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -111,8 +110,6 @@ func (h *JobHandler) Delete(c *fiber.Ctx) error {
 		})
 	}
 
-	fmt.Print("delete job" + id.String())
-
 	err = h.jobUsecase.Delete(c.Context(), id)
 	if err != nil {
 
@@ -179,8 +176,6 @@ func (h *JobHandler) AddMaterial(c *fiber.Ctx) error {
 			"error": "Invalid request body",
 		})
 	}
-
-	fmt.Println(req)
 
 	err = h.jobUsecase.AddMaterial(c.Context(), jobID, req)
 	if err != nil {
