@@ -7,22 +7,22 @@ import (
 )
 
 type CreateContractRequest struct {
-	ProjectID           uuid.UUID             `json:"project_id" validate:"required"`
-	ProjectDescription  string                `json:"project_description" validate:"required,min=1,max=500"`
-	AreaSize            float64               `json:"area_size" validate:"required,min=0"`
-	StartDate           time.Time             `json:"start_date" validate:"required,ltefield=EndDate"`
-	EndDate             time.Time             `json:"end_date" validate:"required"`
-	ForceMajeure        string                `json:"force_majeure" validate:"max=1000"`
-	BreachOfContract    string                `json:"breach_of_contract" validate:"max=1000"`
-	EndOfContract       string                `json:"end_of_contract" validate:"max=1000"`
-	TerminationContract string                `json:"termination_of_contract" validate:"max=1000"`
-	Amendment           string                `json:"amendment" validate:"max=1000"`
-	GuaranteeWithin     int                   `json:"guarantee_within" validate:"required,min=0,max=365"`
-	RetentionMoney      float64               `json:"retention_money" validate:"required,min=0"`
-	PayWithin           int                   `json:"pay_within" validate:"required,min=0,max=365"`
-	ValidateWithin      int                   `json:"validate_within" validate:"required,min=0,max=365"`
-	Format              []string              `json:"format" validate:"required,min=1,dive,required,oneof=pdf doc docx xls xlsx dwg"`
-	Periods             []CreatePeriodRequest `json:"periods" validate:"required,min=1,max=100,dive"`
+	ProjectID           uuid.UUID             `json:"project_id"`
+	ProjectDescription  string                `json:"project_description"`
+	AreaSize            float64               `json:"area_size"`
+	StartDate           time.Time             `json:"start_date"`
+	EndDate             time.Time             `json:"end_date"`
+	ForceMajeure        string                `json:"force_majeure"`
+	BreachOfContract    string                `json:"breach_of_contract"`
+	EndOfContract       string                `json:"end_of_contract"`
+	TerminationContract string                `json:"termination_of_contract"`
+	Amendment           string                `json:"amendment"`
+	GuaranteeWithin     int                   `json:"guarantee_within"`
+	RetentionMoney      float64               `json:"retention_money"`
+	PayWithin           int                   `json:"pay_within"`
+	ValidateWithin      int                   `json:"validate_within"`
+	Format              []string              `json:"format"`
+	Periods             []CreatePeriodRequest `json:"periods"`
 }
 
 type CreatePeriodRequest struct {

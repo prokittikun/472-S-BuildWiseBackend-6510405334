@@ -48,10 +48,9 @@ type Contract struct {
 	RetentionMoney      float64     `db:"retention_money"`
 	PayWithin           int         `db:"pay_within"`
 	ValidateWithin      int         `db:"validate_within"`
-	FileURL             string      `db:"file_url"`
 	Format              StringArray `db:"format"`
 	CreatedAt           time.Time   `db:"created_at"`
-	UpdatedAt           time.Time   `db:"updated_at"`
+	UpdatedAt           *time.Time  `db:"updated_at"`
 	Periods             []Period    `db:"-"`
 }
 

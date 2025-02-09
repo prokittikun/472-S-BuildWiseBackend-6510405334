@@ -88,11 +88,6 @@ func main() {
 	GeneralCostHandler := rest.NewGeneralCostHandler(generalCostUseCase)
 	GeneralCostHandler.GeneralCostRoutes(app)
 
-	quotationRepo := postgres.NewQuotationRepository(db)
-	quotationUseCase := usecase.NewQuotationUsecase(quotationRepo)
-	QuotationHandler := rest.NewQuotationHandler(quotationUseCase)
-	QuotationHandler.QuotationRoutes(app)
-
 	companyRepo := postgres.NewCompanyRepository(db)
 	companyUseCase := usecase.NewCompanyUsecase(companyRepo)
 	CompanyHandler := rest.NewCompanyHandler(companyUseCase)
@@ -102,6 +97,11 @@ func main() {
 	contractUseCase := usecase.NewContractUsecase(contractRepo, projectRepo)
 	ContractHandler := rest.NewContractHandler(contractUseCase)
 	ContractHandler.ContractRoutes(app)
+
+	quotationRepo := postgres.NewQuotationRepository(db)
+	quotationUseCase := usecase.NewQuotationUsecase(quotationRepo, contractUseCase)
+	QuotationHandler := rest.NewQuotationHandler(quotationUseCase)
+	QuotationHandler.QuotationRoutes(app)
 
 	invoiceRepo := postgres.NewInvoiceRepository(db)
 	invoiceUseCase := usecase.NewInvoiceUsecase(invoiceRepo, projectRepo)
