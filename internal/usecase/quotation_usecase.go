@@ -23,14 +23,20 @@ type QuotationUsecase interface {
 }
 
 type quotationUsecase struct {
-	quotationRepo repositories.QuotationRepository
+	quotationRepo   repositories.QuotationRepository
+	contractUsecase ContractUseCase // Add contract usecase
 }
 
-func NewQuotationUsecase(quotationRepo repositories.QuotationRepository) QuotationUsecase {
+func NewQuotationUsecase(
+	quotationRepo repositories.QuotationRepository,
+	contractUsecase ContractUseCase,
+) QuotationUsecase {
 	return &quotationUsecase{
-		quotationRepo: quotationRepo,
+		quotationRepo:   quotationRepo,
+		contractUsecase: contractUsecase,
 	}
 }
+
 func (u *quotationUsecase) buildQuotationResponse(
 	quotation *models.Quotation,
 	jobs []models.QuotationJob,
@@ -149,13 +155,26 @@ func (u *quotationUsecase) ApproveQuotation(ctx context.Context, projectID uuid.
 	// Validate approval conditions
 	err := u.quotationRepo.ValidateApproval(ctx, projectID)
 	if err != nil {
-		return err
+		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	// If validation passes, approve the quotation
+	// Start transaction if needed
+	// If using transaction, wrap the following operations in tx
+
+	// Approve the quotation
 	err = u.quotationRepo.ApproveQuotation(ctx, projectID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to approve quotation: %w", err)
+	}
+
+	// Create contract after quotation approval
+	req := requests.CreateContractRequest{
+		ProjectID: projectID,
+	}
+	err = u.contractUsecase.Create(ctx, &req)
+	fmt.Println("Contract created successfully")
+	if err != nil {
+		return fmt.Errorf("failed to create contract: %w", err)
 	}
 
 	// Get updated quotation details for response
@@ -174,11 +193,10 @@ func (u *quotationUsecase) ApproveQuotation(ctx context.Context, projectID uuid.
 		return fmt.Errorf("failed to get quotation costs: %w", err)
 	}
 
-	// Build and return response
+	// Build response
 	_ = u.buildQuotationResponse(quotation, jobs, costs)
 	return nil
 }
-
 func (u *quotationUsecase) ExportQuotation(ctx context.Context, projectID uuid.UUID) (*responses.QuotationExportData, error) {
 
 	boqStatus, err := u.quotationRepo.CheckBOQStatus(ctx, projectID)

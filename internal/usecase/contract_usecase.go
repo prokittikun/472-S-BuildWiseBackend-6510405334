@@ -6,6 +6,7 @@ import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,39 +35,83 @@ func NewContractUsecase(
 }
 
 func (u *contractUseCase) Create(ctx context.Context, req *requests.CreateContractRequest) error {
-	// Validate project exists
-	if err := u.projectRepo.ValidateProjectStatus(ctx, req.ProjectID); err != nil {
-		return err
+	// Get project details for any missing information
+	projectDetails, err := u.projectRepo.GetByID(ctx, req.ProjectID)
+	if err != nil {
+		return fmt.Errorf("failed to get project details: %w", err)
 	}
 
-	// Create contract model
+	// Set default values for empty fields
+	projectDescription := req.ProjectDescription
+	if projectDescription == "" {
+		projectDescription = projectDetails.Description // Use project description as default
+	}
+
+	areaSize := req.AreaSize
+	if areaSize <= 0 {
+		areaSize = 0 // Default to 0 if not provided
+	}
+
+	startDate := req.StartDate
+	if startDate.IsZero() {
+		startDate = time.Now() // Use current time as default start date
+	}
+
+	endDate := req.EndDate
+	if endDate.IsZero() {
+		endDate = startDate.AddDate(1, 0, 0) // Default to 1 year from start date
+	}
+
+	guaranteeWithin := req.GuaranteeWithin
+	if guaranteeWithin <= 0 {
+		guaranteeWithin = 30 // Default 30 days
+	}
+
+	retentionMoney := 0.0
+
+	payWithin := req.PayWithin
+	if payWithin <= 0 {
+		payWithin = 30 // Default 30 days
+	}
+
+	validateWithin := req.ValidateWithin
+	if validateWithin <= 0 {
+		validateWithin = 7 // Default 7 days
+	}
+
+	format := req.Format
+	if len(format) == 0 {
+		format = []string{"pdf"} // Default format
+	}
+
+	// Create contract model with defaults
 	contract := &models.Contract{
 		ProjectID:           req.ProjectID,
-		ProjectDescription:  req.ProjectDescription,
-		AreaSize:            req.AreaSize,
-		StartDate:           req.StartDate,
-		EndDate:             req.EndDate,
+		ProjectDescription:  projectDescription,
+		AreaSize:            areaSize,
+		StartDate:           startDate,
+		EndDate:             endDate,
 		ForceMajeure:        req.ForceMajeure,
 		BreachOfContract:    req.BreachOfContract,
 		EndOfContract:       req.EndOfContract,
 		TerminationContract: req.TerminationContract,
 		Amendment:           req.Amendment,
-		GuaranteeWithin:     req.GuaranteeWithin,
-		RetentionMoney:      req.RetentionMoney,
-		PayWithin:           req.PayWithin,
-		ValidateWithin:      req.ValidateWithin,
-		Format:              models.StringArray(req.Format),
+		GuaranteeWithin:     guaranteeWithin,
+		RetentionMoney:      retentionMoney,
+		PayWithin:           payWithin,
+		ValidateWithin:      validateWithin,
+		Format:              models.StringArray(format),
 		CreatedAt:           time.Now(),
+		UpdatedAt:           nil,
 	}
 
 	// Create contract
 	if err := u.contractRepo.Create(ctx, contract); err != nil {
-		return err
+		return fmt.Errorf("failed to create contract: %w", err)
 	}
 
 	return nil
 }
-
 func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *requests.UpdateContractRequest) error {
 	// Get existing contract
 	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
@@ -107,7 +152,8 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 	if len(req.Format) > 0 {
 		contract.Format = models.StringArray(req.Format)
 	}
-	contract.UpdatedAt = time.Now()
+	now := time.Now()
+	contract.UpdatedAt = &now
 
 	// Update contract
 	if err := u.contractRepo.Update(ctx, contract); err != nil {
@@ -145,7 +191,7 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 		ValidateWithin:      contract.ValidateWithin,
 		Format:              []string(contract.Format),
 		CreatedAt:           contract.CreatedAt,
-		UpdatedAt:           contract.UpdatedAt,
+		UpdatedAt:           *contract.UpdatedAt,
 		Periods:             make([]responses.PeriodResponse, len(contract.Periods)),
 	}
 
@@ -171,4 +217,14 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 	}
 
 	return response, nil
+}
+
+func calculateRetentionMoney(jobs []models.QuotationJob) float64 {
+	var total float64
+	for _, job := range jobs {
+		if job.TotalSellingPrice.Valid {
+			total += job.TotalSellingPrice.Float64
+		}
+	}
+	return total * 0.05 // 5% retention
 }

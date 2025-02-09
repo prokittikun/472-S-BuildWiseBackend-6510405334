@@ -24,7 +24,7 @@ func NewContractRepository(db *sqlx.DB) repositories.ContractRepository {
 
 // Create ...
 func (r *contractRepository) Create(ctx context.Context, contract *models.Contract) error {
-	query := `INSERT INTO contracts (
+	query := `INSERT INTO contract (
 		contract_id, project_id, created_at
 	) VALUES (
 		:contract_id, :project_id, :created_at
@@ -41,7 +41,7 @@ func (r *contractRepository) Create(ctx context.Context, contract *models.Contra
 // Update ...
 func (r *contractRepository) Update(ctx context.Context, contract *models.Contract) error {
 	query := `
-		UPDATE contracts SET
+		UPDATE contract SET
 			project_description = :project_description,
 			area_size = :area_size,
 			start_date = :start_date,
@@ -55,7 +55,6 @@ func (r *contractRepository) Update(ctx context.Context, contract *models.Contra
 			retention_money = :retention_money,
 			pay_within = :pay_within,
 			validate_within = :validate_within,
-			file_url = :file_url,
 			format = :format,
 			updated_at = :updated_at
 		WHERE contract_id = :contract_id`
@@ -75,7 +74,6 @@ func (r *contractRepository) Update(ctx context.Context, contract *models.Contra
 		"retention_money":         contract.RetentionMoney,
 		"pay_within":              contract.PayWithin,
 		"validate_within":         contract.ValidateWithin,
-		"file_url":                contract.FileURL,
 		"format":                  contract.Format,
 		"updated_at":              contract.UpdatedAt,
 	}
@@ -102,7 +100,7 @@ func (r *contractRepository) Update(ctx context.Context, contract *models.Contra
 
 // Delete ...
 func (r *contractRepository) Delete(ctx context.Context, projectID uuid.UUID) error {
-	query := `DELETE FROM contracts WHERE project_id = $1`
+	query := `DELETE FROM contract WHERE project_id = $1`
 	result, err := r.db.ExecContext(ctx, query, projectID)
 	if err != nil {
 		return fmt.Errorf("failed to delete contract: %w", err)
@@ -123,7 +121,7 @@ func (r *contractRepository) Delete(ctx context.Context, projectID uuid.UUID) er
 // GetByProjectID ...
 func (r *contractRepository) GetByProjectID(ctx context.Context, projectID uuid.UUID) (*models.Contract, error) {
 	var contract models.Contract
-	query := `SELECT * FROM contracts WHERE project_id = $1`
+	query := `SELECT * FROM contract WHERE project_id = $1`
 	err := r.db.GetContext(ctx, &contract, query, projectID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -137,7 +135,7 @@ func (r *contractRepository) GetByProjectID(ctx context.Context, projectID uuid.
 // ValidateProjectStatus ...
 func (r *contractRepository) ValidateProjectStatus(ctx context.Context, projectID uuid.UUID) error {
 	var exists bool
-	query := `SELECT EXISTS (SELECT 1 FROM contracts WHERE project_id = $1)`
+	query := `SELECT EXISTS (SELECT 1 FROM contract WHERE project_id = $1)`
 	err := r.db.GetContext(ctx, &exists, query, projectID)
 	if err != nil {
 		return err
