@@ -21,20 +21,23 @@ type ContractUseCase interface {
 }
 
 type contractUseCase struct {
-	contractRepo repositories.ContractRepository
-	periodRepo   repositories.PeriodRepository
-	projectRepo  repositories.ProjectRepository
+	contractRepo  repositories.ContractRepository
+	periodRepo    repositories.PeriodRepository
+	projectRepo   repositories.ProjectRepository
+	quotationRepo repositories.QuotationRepository
 }
 
 func NewContractUsecase(
 	contractRepo repositories.ContractRepository,
 	periodRepo repositories.PeriodRepository,
 	projectRepo repositories.ProjectRepository,
+	quotationRepo repositories.QuotationRepository,
 ) ContractUseCase {
 	return &contractUseCase{
-		contractRepo: contractRepo,
-		periodRepo:   periodRepo,
-		projectRepo:  projectRepo,
+		contractRepo:  contractRepo,
+		periodRepo:    periodRepo,
+		projectRepo:   projectRepo,
+		quotationRepo: quotationRepo,
 	}
 }
 
@@ -437,8 +440,69 @@ func (u *contractUseCase) ChangeStatus(ctx context.Context, projectID uuid.UUID,
 		return fmt.Errorf("failed to get contract: %w", err)
 	}
 
-	if contract == nil {
-		return fmt.Errorf("contract not found")
+	//validate every filled in contract is not empty
+	if contract.ProjectDescription.String == "" {
+		return fmt.Errorf("project description is empty")
+	}
+	if contract.AreaSize.Float64 == 0 {
+		return fmt.Errorf("area size is empty")
+	}
+	if contract.StartDate.Time.IsZero() {
+		return fmt.Errorf("start date is empty")
+	}
+	if contract.EndDate.Time.IsZero() {
+		return fmt.Errorf("end date is empty")
+	}
+	if contract.ForceMajeure.String == "" {
+		return fmt.Errorf("force majeure is empty")
+	}
+	if contract.BreachOfContract.String == "" {
+		return fmt.Errorf("breach of contract is empty")
+	}
+	if contract.EndOfContract.String == "" {
+		return fmt.Errorf("end of contract is empty")
+	}
+	if contract.TerminationContract.String == "" {
+		return fmt.Errorf("termination contract is empty")
+	}
+	if contract.Amendment.String == "" {
+		return fmt.Errorf("amendment is empty")
+	}
+	if contract.GuaranteeWithin.Int32 == 0 {
+		return fmt.Errorf("guarantee within is empty")
+	}
+	if contract.RetentionMoney.Float64 == 0 {
+		return fmt.Errorf("retention money is empty")
+	}
+	if contract.PayWithin.Int32 == 0 {
+		return fmt.Errorf("pay within is empty")
+	}
+	if contract.ValidateWithin.Int32 == 0 {
+		return fmt.Errorf("validate within is empty")
+	}
+	if len(contract.Format) == 0 {
+		return fmt.Errorf("format is empty")
+	}
+
+	quotation, err := u.quotationRepo.GetByProjectID(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to get quotation: %w", err)
+	}
+	if quotation == nil {
+		return fmt.Errorf("quotation not found")
+	}
+
+	var final_amount float64
+	if quotation.FinalAmount.Valid {
+		final_amount = quotation.FinalAmount.Float64
+	}
+
+	var sum_amount_period float64
+	for _, period := range contract.Periods {
+		sum_amount_period += period.AmountPeriod
+	}
+	if sum_amount_period != final_amount {
+		return fmt.Errorf("sum amount period is not equal to final amount in quotation")
 	}
 
 	if status == "approved" {

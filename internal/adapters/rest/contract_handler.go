@@ -25,7 +25,7 @@ func (h *ContractHandler) ContractRoutes(app *fiber.App) {
 	contract.Delete("/:project_id", h.DeleteContract)
 	//change status of contract
 
-	contract.Get("/:project_id/status", h.GetContractByProjectID)
+	contract.Put("/:project_id/status", h.ChangeStatus)
 	contract.Get("/:project_id", h.GetContractByProjectID)
 }
 
@@ -119,7 +119,7 @@ func (h *ContractHandler) ChangeStatus(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.contractUseCase.ChangeStatus(c.Context(), projectID, "ap"); err != nil {
+	if err := h.contractUseCase.ChangeStatus(c.Context(), projectID, "approved"); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": err.Error(),
 		})
