@@ -17,6 +17,7 @@ type ContractUseCase interface {
 	Update(ctx context.Context, projectID uuid.UUID, req *requests.UpdateContractRequest) error
 	Delete(ctx context.Context, projectID uuid.UUID) error
 	GetByProjectID(ctx context.Context, projectID uuid.UUID) (*responses.ContractResponse, error)
+	ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error
 }
 
 type contractUseCase struct {
@@ -378,6 +379,9 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 	if contract.PayWithin.Valid {
 		response.PayWithin = int(contract.PayWithin.Int32)
 	}
+	if contract.Status.Valid {
+		response.Status = contract.Status.String
+	}
 	if contract.ValidateWithin.Valid {
 		response.ValidateWithin = int(contract.ValidateWithin.Int32)
 	}
@@ -422,4 +426,25 @@ func calculateRetentionMoney(jobs []models.QuotationJob) float64 {
 		}
 	}
 	return total * 0.05 // 5% retention
+}
+
+func (u *contractUseCase) ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error {
+	//contractRepo.ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error
+
+	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
+	if err != nil {
+
+		return fmt.Errorf("failed to get contract: %w", err)
+	}
+
+	if contract == nil {
+		return fmt.Errorf("contract not found")
+	}
+
+	if status == "approved" {
+		u.contractRepo.ChangeStatus(ctx, projectID, status)
+	}
+
+	return nil
+
 }
