@@ -27,4 +27,5 @@ type UpdateInvoiceRequest struct {
 	PaidDate       *string `json:"paid_date" validate:"omitempty,datetime=2006-01-02"`
 	PaymentTerm    *string `json:"payment_term"`
 	Remarks        *string `json:"remarks"`
+	Retention      *int    `json:"retention"`
 }

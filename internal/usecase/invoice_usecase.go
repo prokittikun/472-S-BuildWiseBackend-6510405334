@@ -143,6 +143,10 @@ func (u *invoiceUseCase) GetInvoiceByID(ctx context.Context, invoiceID uuid.UUID
 		response.Remarks = invoice.Remarks.String
 	}
 
+	if invoice.Retention.Valid {
+		response.Retention = int(invoice.Retention.Int32)
+	}
+
 	if invoice.UpdatedAt.Valid {
 		response.UpdatedAt = invoice.UpdatedAt.Time
 	}
@@ -246,10 +250,18 @@ func (u *invoiceUseCase) UpdateInvoice(ctx context.Context, invoiceID uuid.UUID,
 		updates["remarks"] = *req.Remarks
 	}
 
+	if req.Retention != nil {
+		if *req.Retention < 0 || *req.Retention > 100 {
+			return fmt.Errorf("retention must be between 0 and 100")
+		}
+		updates["retention"] = *req.Retention
+	}
+
 	if len(updates) == 0 {
 		return errors.New("no fields to update")
 	}
 
+	// Update the invoice
 	err = u.invoiceRepo.Update(ctx, invoiceID, updates)
 	if err != nil {
 		return fmt.Errorf("failed to update invoice: %w", err)

@@ -19,6 +19,7 @@ type Invoice struct {
 	Status         sql.NullString `db:"status"`
 	CreatedAt      time.Time      `db:"created_at"`
 	UpdatedAt      sql.NullTime   `db:"updated_at"`
+	Retention      sql.NullInt32  `db:"retention"`
 
 	// Related data (not stored in database)
 	Period Period `db:"-"`
