@@ -22,10 +22,10 @@ type UpdateInvoicePaidRequest struct {
 }
 
 type UpdateInvoiceRequest struct {
-	InvoiceDate    *string `json:"invoice_date" validate:"omitempty,datetime=2006-01-02"`
-	PaymentDueDate *string `json:"payment_due_date" validate:"omitempty,datetime=2006-01-02"`
-	PaidDate       *string `json:"paid_date" validate:"omitempty,datetime=2006-01-02"`
-	PaymentTerm    *string `json:"payment_term"`
-	Remarks        *string `json:"remarks"`
-	Retention      *int    `json:"retention"`
+	InvoiceDate    *string  `json:"invoice_date" validate:"omitempty,datetime=2006-01-02"`
+	PaymentDueDate *string  `json:"payment_due_date" validate:"omitempty,datetime=2006-01-02"`
+	PaidDate       *string  `json:"paid_date" validate:"omitempty,datetime=2006-01-02"`
+	PaymentTerm    *string  `json:"payment_term"`
+	Remarks        *string  `json:"remarks"`
+	Retention      *float64 `json:"retention"`
 }

@@ -144,7 +144,7 @@ func (u *invoiceUseCase) GetInvoiceByID(ctx context.Context, invoiceID uuid.UUID
 	}
 
 	if invoice.Retention.Valid {
-		response.Retention = int(invoice.Retention.Int32)
+		response.Retention = invoice.Retention.Float64
 	}
 
 	if invoice.UpdatedAt.Valid {
