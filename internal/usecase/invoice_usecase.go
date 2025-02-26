@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -16,6 +17,8 @@ type InvoiceUseCase interface {
 	GetInvoiceByID(ctx context.Context, invoiceID uuid.UUID) (*responses.InvoiceResponse, error)
 	UpdateInvoiceStatus(ctx context.Context, invoiceID uuid.UUID, req requests.UpdateInvoiceStatusRequest) error
 	CreateInvoicesForAllPeriods(ctx context.Context, projectID uuid.UUID) error
+	UpdateInvoice(ctx context.Context, invoiceID uuid.UUID, req requests.UpdateInvoiceRequest) error // New method
+
 }
 
 type invoiceUseCase struct {
@@ -191,9 +194,65 @@ func (u *invoiceUseCase) CreateInvoicesForAllPeriods(ctx context.Context, projec
 	if !contract.PayWithin.Valid {
 		return errors.New("contract PayWithin is not valid")
 	}
-	err = u.invoiceRepo.CreateForAllPeriods(ctx, projectID, contract.ContractID, fmt.Sprintf("%d วัน", contract.PayWithin.Int32))
+	err = u.invoiceRepo.CreateForAllPeriods(ctx, projectID, contract.ContractID, "")
 	if err != nil {
 		return fmt.Errorf("failed to create invoices: %w", err)
+	}
+
+	return nil
+}
+
+func (u *invoiceUseCase) UpdateInvoice(ctx context.Context, invoiceID uuid.UUID, req requests.UpdateInvoiceRequest) error {
+	invoice, err := u.invoiceRepo.GetByID(ctx, invoiceID)
+	if err != nil {
+		return fmt.Errorf("failed to get invoice: %w", err)
+	}
+
+	if invoice == nil {
+		return errors.New("invoice not found")
+	}
+
+	updates := make(map[string]interface{})
+
+	if req.InvoiceDate != nil {
+		date, err := time.Parse("2006-01-02", *req.InvoiceDate)
+		if err != nil {
+			return fmt.Errorf("invalid invoice date format: %w", err)
+		}
+		updates["invoice_date"] = date
+	}
+
+	if req.PaymentDueDate != nil {
+		date, err := time.Parse("2006-01-02", *req.PaymentDueDate)
+		if err != nil {
+			return fmt.Errorf("invalid payment due date format: %w", err)
+		}
+		updates["payment_due_date"] = date
+	}
+
+	if req.PaidDate != nil {
+		date, err := time.Parse("2006-01-02", *req.PaidDate)
+		if err != nil {
+			return fmt.Errorf("invalid paid date format: %w", err)
+		}
+		updates["paid_date"] = date
+	}
+
+	if req.PaymentTerm != nil {
+		updates["payment_term"] = *req.PaymentTerm
+	}
+
+	if req.Remarks != nil {
+		updates["remarks"] = *req.Remarks
+	}
+
+	if len(updates) == 0 {
+		return errors.New("no fields to update")
+	}
+
+	err = u.invoiceRepo.Update(ctx, invoiceID, updates)
+	if err != nil {
+		return fmt.Errorf("failed to update invoice: %w", err)
 	}
 
 	return nil
