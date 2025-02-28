@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -56,13 +57,14 @@ func (u *contractUseCase) Create(ctx context.Context, req *requests.CreateContra
 			Float64: req.AreaSize,
 			Valid:   req.AreaSize != 0,
 		},
+
 		StartDate: sql.NullTime{
-			Time:  req.StartDate,
-			Valid: !req.StartDate.IsZero(),
+			Time:  time.Now(),
+			Valid: true,
 		},
 		EndDate: sql.NullTime{
-			Time:  req.EndDate,
-			Valid: !req.EndDate.IsZero(),
+			Time:  time.Now(),
+			Valid: true,
 		},
 		ForceMajeure: sql.NullString{
 			String: req.ForceMajeure,
@@ -439,18 +441,6 @@ func (u *contractUseCase) ChangeStatus(ctx context.Context, projectID uuid.UUID,
 	}
 	if contract.Amendment == "" {
 		return fmt.Errorf("amendment is empty")
-	}
-	if contract.GuaranteeWithin == 0 {
-		return fmt.Errorf("guarantee within is empty")
-	}
-	if contract.RetentionMoney == 0 {
-		return fmt.Errorf("retention money is empty")
-	}
-	if contract.PayWithin == 0 {
-		return fmt.Errorf("pay within is empty")
-	}
-	if contract.ValidateWithin == 0 {
-		return fmt.Errorf("validate within is empty")
 	}
 	if len(contract.Format) == 0 {
 		return fmt.Errorf("format is empty")
