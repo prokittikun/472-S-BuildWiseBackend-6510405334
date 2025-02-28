@@ -8,7 +8,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -46,7 +45,10 @@ func NewContractUsecase(
 }
 
 func (u *contractUseCase) Create(ctx context.Context, req *requests.CreateContractRequest) error {
-	// Create the contract first
+	project, err := u.projectRepo.GetByID(ctx, req.ProjectID)
+	if err != nil {
+		return fmt.Errorf("failed to get project: %w", err)
+	}
 	contract := &models.Contract{
 		ProjectID: req.ProjectID,
 		ProjectDescription: sql.NullString{
@@ -59,11 +61,11 @@ func (u *contractUseCase) Create(ctx context.Context, req *requests.CreateContra
 		},
 
 		StartDate: sql.NullTime{
-			Time:  time.Now(),
+			Time:  project.CreatedAt,
 			Valid: true,
 		},
 		EndDate: sql.NullTime{
-			Time:  time.Now(),
+			Time:  project.CreatedAt,
 			Valid: true,
 		},
 		ForceMajeure: sql.NullString{

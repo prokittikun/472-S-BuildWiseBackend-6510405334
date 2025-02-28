@@ -195,9 +195,6 @@ func (u *invoiceUseCase) CreateInvoicesForAllPeriods(ctx context.Context, projec
 		return errors.New("contract does not belong to the specified project")
 	}
 
-	if !contract.PayWithin.Valid {
-		return errors.New("contract PayWithin is not valid")
-	}
 	err = u.invoiceRepo.CreateForAllPeriods(ctx, projectID, contract.ContractID, "")
 	if err != nil {
 		return fmt.Errorf("failed to create invoices: %w", err)
