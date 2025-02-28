@@ -251,9 +251,6 @@ func (u *invoiceUseCase) UpdateInvoice(ctx context.Context, invoiceID uuid.UUID,
 	}
 
 	if req.Retention != nil {
-		if *req.Retention < 0 || *req.Retention > 100 {
-			return fmt.Errorf("retention must be between 0 and 100")
-		}
 		updates["retention"] = *req.Retention
 	}
 
